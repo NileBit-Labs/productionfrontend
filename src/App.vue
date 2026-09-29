@@ -109,7 +109,7 @@ async function onLogout() {
         <img class="brand-icon" :src="brandIconUrl" alt="" />
         <span class="brand-copy">
           <span class="brand-name">NileBit <span class="brand-name-accent">POS</span></span>
-          <span class="brand-edition">For Retail</span>
+          <span class="brand-edition">For Production</span>
         </span>
       </RouterLink>
 

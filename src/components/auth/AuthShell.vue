@@ -29,7 +29,7 @@ withDefaults(
         class="brand-lockup"
         :class="{ 'brand-lockup--compact': compactBrand }"
         :src="brandLockupUrl"
-        alt="NileBit POS for Retail"
+        alt="NileBit POS for Production"
       />
       <p v-if="eyebrow" class="eyebrow">{{ eyebrow }}</p>
       <h1>{{ title }}</h1>

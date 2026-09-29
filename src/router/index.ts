@@ -131,6 +131,12 @@ const router = createRouter({
       component: () => import('../views/inventory/InventoryView.vue'),
       meta: { requiresAuth: true, title: 'Inventory', managerOnly: true },
     },
+    ...['raw-materials', 'recipes', 'batches', 'traceability', 'profitability'].map((name) => ({
+      path: `/production/${name}`,
+      name,
+      component: () => import('../views/production/ProductionWorkspaceView.vue'),
+      meta: { requiresAuth: true, title: name === 'raw-materials' ? 'Raw materials' : name === 'recipes' ? 'Recipes & BOMs' : name === 'batches' ? 'Production batches' : name === 'traceability' ? 'Batch traceability' : 'Costing & profitability', managerOnly: true },
+    })),
     {
       path: '/suppliers',
       name: 'suppliers',

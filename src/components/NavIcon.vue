@@ -48,6 +48,16 @@ defineProps<{ name: string }>()
       <polyline points="3 17 12 21 21 17" />
     </template>
 
+    <template v-else-if="name === 'recipes'">
+      <path d="M7 3h10v5l-3 3v10H7V11L4 8V3h3" />
+      <path d="M9 6h6M9 15h3" />
+    </template>
+
+    <template v-else-if="name === 'batches' || name === 'traceability'">
+      <path d="M12 3c3.5 4 6 7.1 6 10a6 6 0 0 1-12 0c0-2.9 2.5-6 6-10z" />
+      <path d="M9 17c.7.7 1.6 1 3 1" />
+    </template>
+
     <template v-else-if="name === 'purchases'">
       <rect x="2" y="8" width="12" height="9" rx="1" />
       <path d="M14 11h4l4 3v3h-8z" />

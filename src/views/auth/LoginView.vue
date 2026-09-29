@@ -28,7 +28,7 @@ async function onSubmit() {
 </script>
 
 <template>
-  <AuthShell title="Log in" subtitle="Run your retail shop from anywhere.">
+  <AuthShell title="Log in" subtitle="Run your production business from anywhere.">
 
       <form class="auth-form" @submit.prevent="onSubmit">
         <p v-if="error" class="alert-danger">{{ error }}</p>

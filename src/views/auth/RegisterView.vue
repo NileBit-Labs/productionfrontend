@@ -34,7 +34,7 @@ async function onSubmit() {
 </script>
 
 <template>
-  <AuthShell title="Create your account" subtitle="Set up your retail business on NileBit POS.">
+  <AuthShell title="Create your account" subtitle="Set up your production business on NileBit POS.">
 
       <form class="auth-form" @submit.prevent="onSubmit">
         <p v-if="error" class="alert-danger">{{ error }}</p>

@@ -1,0 +1,610 @@
+:root {
+  --color-primary: #0f766e;
+  --color-primary-hover: #0b5c56;
+  --color-primary-soft: #ecf7f6;
+  --color-on-primary: #ffffff;
+
+  --color-ink: #1a1f2b;
+  --color-ink-soft: #4b5567;
+  --color-ink-faint: #7c8698;
+
+  --color-surface: #ffffff;
+  --color-canvas: #f6f7f9;
+  --color-border: #e2e5ea;
+  --color-border-strong: #cbd0d8;
+
+  --color-danger: #b3261e;
+  --color-on-danger: #ffffff;
+  --color-danger-soft: #fdecec;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --control-height: 40px;
+  --control-height-compact: 34px;
+  --touch-target-min: 44px;
+
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 16px rgba(16, 24, 40, 0.06);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-primary: #2dd4bf;
+    --color-primary-hover: #5eead4;
+    --color-primary-soft: rgba(45, 212, 191, 0.14);
+    --color-on-primary: #04302b;
+
+    --color-ink: #f1f5f9;
+    --color-ink-soft: #b6bfcc;
+    --color-ink-faint: #838ea0;
+
+    --color-surface: #1c212c;
+    --color-canvas: #10131a;
+    --color-border: #2a3040;
+    --color-border-strong: #3a4256;
+
+    --color-danger: #f87171;
+    --color-on-danger: #3b0a08;
+    --color-danger-soft: rgba(248, 113, 113, 0.14);
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.3);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-primary: #2dd4bf;
+  --color-primary-hover: #5eead4;
+  --color-primary-soft: rgba(45, 212, 191, 0.14);
+  --color-on-primary: #04302b;
+
+  --color-ink: #f1f5f9;
+  --color-ink-soft: #b6bfcc;
+  --color-ink-faint: #838ea0;
+
+  --color-surface: #1c212c;
+  --color-canvas: #10131a;
+  --color-border: #2a3040;
+  --color-border-strong: #3a4256;
+
+  --color-danger: #f87171;
+  --color-on-danger: #3b0a08;
+  --color-danger-soft: rgba(248, 113, 113, 0.14);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.3);
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  color: var(--color-ink);
+  background: var(--color-canvas);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+  line-height: 1.5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  color: var(--color-ink);
+  line-height: 1.25;
+}
+
+button {
+  font-family: inherit;
+}
+
+:where(a, button, input, select, textarea, [role='radio']):focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  color: var(--color-ink);
+}
+
+/* Shared primitives, reused across auth, setup, and future module screens */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.field label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-ink-soft);
+}
+
+.field input,
+.field select {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.9375rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: var(--control-height);
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* Shared sizing helpers: compact is an explicit desktop-density choice;
+   operational controls can opt into a reliably tappable target. */
+.btn-compact {
+  min-height: var(--control-height-compact);
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+}
+
+.mobile-control {
+  min-height: var(--touch-target-min);
+}
+
+.alert-danger {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.link {
+  color: var(--color-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* Shared building blocks for list/management screens (ui- prefix so they can't
+   collide with the older per-screen styles). */
+
+.ui-page {
+  flex: 1;
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 1.75rem 2rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ui-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.ui-head h1 {
+  margin-top: 0.25rem;
+  font-size: 1.5rem;
+}
+
+.ui-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.ui-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ui-btn-secondary {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.ui-btn-secondary:hover:not(:disabled) {
+  border-color: var(--color-ink-faint);
+}
+
+.ui-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.ui-filters .field {
+  min-width: 150px;
+}
+
+.ui-filters .grow {
+  flex: 1;
+  min-width: 220px;
+}
+
+.ui-chips {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ui-chip {
+  min-height: 36px;
+  padding: 0 0.875rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ui-chip.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.ui-table-card {
+  overflow: hidden;
+}
+
+.ui-table-scroll {
+  overflow-x: auto;
+}
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.ui-table th {
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-ink-faint);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ui-table td {
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.ui-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ui-table tbody tr.clickable {
+  cursor: pointer;
+}
+
+.ui-table tbody tr.clickable:hover {
+  background: var(--color-canvas);
+}
+
+.ui-table .num {
+  text-align: right;
+}
+
+.ui-table .muted,
+.ui-muted {
+  color: var(--color-ink-faint);
+}
+
+.ui-table small {
+  display: block;
+  color: var(--color-ink-faint);
+  font-size: 0.75rem;
+}
+
+.table-text-action {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.table-text-action:hover {
+  text-decoration: underline;
+}
+
+/* Mobile counterparts for the desktop tables. ResponsiveDataView changes only
+   the presentation at phone widths; each screen still owns its field order. */
+.data-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.data-row:last-child {
+  border-bottom: none;
+}
+
+.data-row-main,
+.data-row-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.data-row-footer {
+  flex-wrap: wrap;
+}
+
+.data-row-title {
+  min-width: 0;
+  color: var(--color-ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.data-row-value {
+  flex-shrink: 0;
+  max-width: 55%;
+  color: var(--color-ink);
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.data-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.75rem;
+  color: var(--color-ink-faint);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.data-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 0.875rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.data-row-action:hover {
+  border-color: var(--color-primary);
+  text-decoration: none;
+}
+
+.data-row-action:focus-visible,
+.table-text-action:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 2px;
+}
+
+.ui-badge {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  background: var(--color-canvas);
+  color: var(--color-ink-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ui-badge.ok {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.ui-badge.warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ui-badge.bad {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.ui-state {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--color-ink-faint);
+}
+
+.ui-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-ink-faint);
+  font-size: 0.8125rem;
+}
+
+.ui-pager div {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.field-error {
+  color: var(--color-danger);
+  font-size: 0.75rem;
+}
+
+.field .hint {
+  color: var(--color-ink-faint);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 860px) {
+  .ui-page {
+    padding: 1.25rem 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .btn:not(.btn-compact) {
+    min-height: var(--touch-target-min);
+  }
+
+  .icon-btn {
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+  }
+
+  .ui-head {
+    align-items: stretch;
+  }
+
+  .ui-actions {
+    width: 100%;
+  }
+
+  .ui-actions .btn {
+    flex: 1 1 auto;
+    min-height: 44px;
+  }
+
+  .ui-filters {
+    padding: 1rem;
+  }
+
+  .ui-filters .field,
+  .ui-filters .grow {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ui-chips {
+    flex-wrap: wrap;
+  }
+
+  .ui-chip {
+    min-height: 44px;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .receipt-print,
+  .receipt-print * {
+    visibility: visible;
+  }
+
+  .receipt-print {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

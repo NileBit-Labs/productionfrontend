@@ -1,0 +1,30 @@
+/* Colours for charts. Kept out of base.css so module work doesn't collide;
+   every chart component imports this once. */
+:root {
+  --chart-1: #0f766e;
+  --chart-2: #d97706;
+  --chart-3: #6366f1;
+  --chart-4: #64748b;
+  --chart-5: #be185d;
+  --chart-negative: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --chart-1: #2dd4bf;
+    --chart-2: #fbbf24;
+    --chart-3: #a5b4fc;
+    --chart-4: #94a3b8;
+    --chart-5: #f472b6;
+    --chart-negative: #f87171;
+  }
+}
+
+:root[data-theme='dark'] {
+  --chart-1: #2dd4bf;
+  --chart-2: #fbbf24;
+  --chart-3: #a5b4fc;
+  --chart-4: #94a3b8;
+  --chart-5: #f472b6;
+  --chart-negative: #f87171;
+}

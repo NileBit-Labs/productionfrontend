@@ -1,0 +1,250 @@
+/* Layout shared by the report tabs (Sales, Profit, Stock, Debt). Prefixed
+   so it can't collide with anything else; imported by ReportsView only. */
+.rp {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.rp-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.rp-tiles.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rp-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.rp-panel {
+  padding: 1.5rem;
+  min-width: 0;
+}
+
+.rp-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.rp-panel-head h2 {
+  font-size: 0.9375rem;
+}
+
+.rp-meta {
+  font-size: 0.75rem;
+  color: var(--color-ink-faint);
+}
+
+.rp-note {
+  color: var(--color-ink-faint);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.rp-note b {
+  color: var(--color-ink-soft);
+  font-weight: 600;
+}
+
+.rp-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--color-ink-faint);
+  font-size: 0.875rem;
+}
+
+.rp-scroll {
+  overflow-x: auto;
+  margin: 0 -1.5rem;
+  padding: 0 1.5rem;
+}
+
+.rp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.rp-table th {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-ink-faint);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.rp-table td {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.rp-table th:first-child,
+.rp-table td:first-child {
+  padding-left: 0;
+}
+
+.rp-table th:last-child,
+.rp-table td:last-child {
+  padding-right: 0;
+}
+
+.rp-table .num {
+  text-align: right;
+}
+
+.rp-table .strong {
+  font-weight: 600;
+}
+
+.rp-table .neg {
+  color: var(--color-danger);
+}
+
+.rp-table .clip {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp-quiet {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.rp-quiet:hover:not(:disabled) {
+  background: var(--color-canvas);
+}
+
+.rp-quiet:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.rp-bars {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.rp-bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) 1fr 7.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.rp-bars .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-soft);
+}
+
+.rp-bars .track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.rp-bars .fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--chart-1);
+}
+
+.rp-bars.wide li {
+  grid-template-columns: minmax(0, 9rem) 1fr 11.5rem;
+}
+
+.rp-bars .amount {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-pill {
+  display: inline-block;
+  padding: 0.0625rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.rp-pill.ok {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.rp-pill.low {
+  background: rgba(217, 119, 6, 0.14);
+  color: var(--chart-2);
+}
+
+.rp-pill.out {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.rp-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .rp-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rp-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .rp-tiles,
+  .rp-tiles.three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rp-panel {
+    padding: 1.125rem;
+  }
+
+  .rp-scroll {
+    margin: 0 -1.125rem;
+    padding: 0 1.125rem;
+  }
+}

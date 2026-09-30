@@ -138,6 +138,12 @@ const router = createRouter({
       meta: { requiresAuth: true, title: name === 'raw-materials' ? 'Raw materials' : name === 'recipes' ? 'Recipes & BOMs' : name === 'batches' ? 'Production batches' : name === 'traceability' ? 'Batch traceability' : 'Costing & profitability', managerOnly: true },
     })),
     {
+      path: '/production/wastage',
+      name: 'wastage',
+      component: () => import('../views/production/WastageView.vue'),
+      meta: { requiresAuth: true, title: 'Wastage', managerOnly: true },
+    },
+    {
       path: '/suppliers',
       name: 'suppliers',
       component: () => import('../views/suppliers/SuppliersView.vue'),

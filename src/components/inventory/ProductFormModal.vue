@@ -30,6 +30,11 @@ const form = reactive({
   current_cost: props.product?.current_cost ?? (null as number | null),
   low_stock_threshold: props.product?.low_stock_threshold ?? 0,
   opening_stock: null as number | null,
+  kind: props.product?.kind ?? ('finished_good' as 'raw_material' | 'packaging' | 'finished_good'),
+  family: props.product?.family ?? '',
+  size_label: props.product?.size_label ?? '',
+  output_equivalent: props.product?.output_equivalent ?? (null as number | null),
+  shelf_life_days: props.product?.shelf_life_days ?? (null as number | null),
   units: (props.product?.units ?? []).map((u) => ({ ...u })) as UnitRow[],
 })
 
@@ -47,6 +52,7 @@ const profit = computed(() => {
   const percent = form.selling_price > 0 ? Math.round((amount / form.selling_price) * 100) : 0
   return { amount, percent }
 })
+const isFinishedGood = computed(() => form.kind === 'finished_good')
 
 function addUnit() {
   form.units.push({ unit_name: '', conversion_to_base_unit: null, selling_price: null })
@@ -80,9 +86,14 @@ async function save() {
       sku: form.sku || null,
       barcode: form.barcode || null,
       base_unit: form.base_unit,
-      selling_price: Math.round(Number(form.selling_price ?? 0)),
+      selling_price: isFinishedGood.value ? Math.round(Number(form.selling_price ?? 0)) : 0,
       current_cost: Math.round(Number(form.current_cost ?? 0)),
       low_stock_threshold: Number(form.low_stock_threshold || 0),
+      kind: form.kind,
+      family: form.family || null,
+      size_label: form.size_label || null,
+      output_equivalent: form.output_equivalent == null ? null : Number(form.output_equivalent),
+      shelf_life_days: form.shelf_life_days == null ? null : Number(form.shelf_life_days),
       units: form.units
         .filter((u) => u.unit_name.trim())
         .map((u) => ({
@@ -130,6 +141,16 @@ async function toggleArchive() {
       <p v-if="error" class="alert-danger">{{ error }}</p>
 
       <div class="field">
+        <label for="p-kind">Product role</label>
+        <select id="p-kind" v-model="form.kind">
+          <option value="finished_good">Finished good (sold through POS)</option>
+          <option value="raw_material">Raw material / ingredient</option>
+          <option value="packaging">Packaging</option>
+        </select>
+        <span class="hint">Only finished goods are available at the till. Inputs are purchased and consumed in batches.</span>
+      </div>
+
+      <div class="field">
         <label for="p-name">Name</label>
         <input id="p-name" v-model="form.name" type="text" required maxlength="255" autofocus />
         <span v-if="errors.name" class="field-error">{{ errors.name }}</span>
@@ -158,8 +179,19 @@ async function toggleArchive() {
         </div>
       </div>
 
-      <div class="row">
+      <div v-if="isFinishedGood" class="row">
         <div class="field">
+          <label for="p-family">Product family <span class="optional">(optional)</span></label>
+          <input id="p-family" v-model="form.family" type="text" maxlength="255" placeholder="Mango Juice" />
+        </div>
+        <div class="field">
+          <label for="p-size">Size <span class="optional">(optional)</span></label>
+          <input id="p-size" v-model="form.size_label" type="text" maxlength="100" placeholder="500ml" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div v-if="isFinishedGood" class="field">
           <label for="p-barcode">Barcode <span class="optional">(scan or type)</span></label>
           <input
             id="p-barcode"
@@ -174,6 +206,17 @@ async function toggleArchive() {
           <label for="p-sku">SKU <span class="optional">(optional)</span></label>
           <input id="p-sku" v-model="form.sku" type="text" maxlength="100" />
           <span v-if="errors.sku" class="field-error">{{ errors.sku }}</span>
+        </div>
+      </div>
+      <div v-if="isFinishedGood" class="row">
+        <div v-if="isFinishedGood" class="field">
+          <label for="p-equivalent">Output equivalent <span class="optional">(optional)</span></label>
+          <input id="p-equivalent" v-model.number="form.output_equivalent" type="number" min="0.001" step="any" placeholder="0.5" />
+          <span class="hint">Required by the batch when more than one finished size is produced.</span>
+        </div>
+        <div class="field">
+          <label for="p-life">Shelf life (days) <span class="optional">(optional)</span></label>
+          <input id="p-life" v-model.number="form.shelf_life_days" type="number" min="1" />
         </div>
       </div>
 
@@ -198,7 +241,7 @@ async function toggleArchive() {
       </div>
 
       <div class="row">
-        <div class="field">
+        <div v-if="isFinishedGood" class="field">
           <label for="p-price">Selling price (UGX)</label>
           <input
             id="p-price"
@@ -211,7 +254,7 @@ async function toggleArchive() {
           <span v-if="errors.selling_price" class="field-error">{{ errors.selling_price }}</span>
         </div>
         <div class="field">
-          <label for="p-cost">Buying cost (UGX)</label>
+          <label for="p-cost">{{ isFinishedGood ? 'Buying cost' : 'Current input cost' }} (UGX)</label>
           <input
             id="p-cost"
             v-model.number="form.current_cost"

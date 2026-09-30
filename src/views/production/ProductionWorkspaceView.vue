@@ -1,133 +1,56 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { apiErrorMessage, apiFetch } from '@/lib/api'
-import { formatQuantity, formatUgx } from '@/lib/format'
+import BaseModal from '@/components/BaseModal.vue'
+import { apiErrorMessage, fieldErrors } from '@/lib/api'
+import { formatQuantity, formatUgx, localDate, uuid } from '@/lib/format'
+import { productionApi } from '@/lib/production'
 
-type Workspace = {
-  eyebrow: string
-  title: string
-  description: string
-  endpoint: string
-  createLabel: string
-  columns: { key: string; label: string; kind?: 'money' | 'quantity' }[]
-  empty: string
-}
-
-const WORKSPACES: Record<string, Workspace> = {
-  'raw-materials': {
-    eyebrow: 'Production inventory', title: 'Raw materials',
-    description: 'Track ingredients, packaging and measurement units separately from finished goods.',
-    endpoint: '/production/raw-materials', createLabel: 'Add raw material',
-    columns: [{ key: 'name', label: 'Material' }, { key: 'unit', label: 'Unit' }, { key: 'on_hand', label: 'On hand', kind: 'quantity' }, { key: 'reorder_level', label: 'Reorder level', kind: 'quantity' }],
-    empty: 'No raw materials yet. Add the ingredients and packaging used in production.',
-  },
-  recipes: {
-    eyebrow: 'Production planning', title: 'Recipes & BOMs',
-    description: 'Define the materials and quantities needed to make each finished product.',
-    endpoint: '/production/recipes', createLabel: 'Create recipe',
-    columns: [{ key: 'name', label: 'Recipe' }, { key: 'product_name', label: 'Finished product' }, { key: 'yield_quantity', label: 'Expected yield', kind: 'quantity' }, { key: 'ingredients_count', label: 'Ingredients', kind: 'quantity' }],
-    empty: 'No recipes yet. Create a bill of materials before recording a batch.',
-  },
-  batches: {
-    eyebrow: 'Production operations', title: 'Production batches',
-    description: 'Record production, actual consumption, output, wastage, and batch traceability.',
-    endpoint: '/production/batches', createLabel: 'Start batch',
-    columns: [{ key: 'batch_number', label: 'Batch' }, { key: 'recipe_name', label: 'Recipe' }, { key: 'status', label: 'Status' }, { key: 'production_date', label: 'Produced' }, { key: 'saleable_output', label: 'Saleable output', kind: 'quantity' }],
-    empty: 'No batches recorded. Start a batch once a recipe is ready.',
-  },
-  traceability: {
-    eyebrow: 'Quality & traceability', title: 'Batch & expiry traceability',
-    description: 'Find finished goods by batch number, production date, and expiry date.',
-    endpoint: '/production/traceability', createLabel: 'View batches',
-    columns: [{ key: 'batch_number', label: 'Batch' }, { key: 'product_name', label: 'Finished product' }, { key: 'produced_at', label: 'Produced' }, { key: 'expires_at', label: 'Expires' }, { key: 'quantity', label: 'Available', kind: 'quantity' }],
-    empty: 'No traceable finished-goods batches are available yet.',
-  },
-  profitability: {
-    eyebrow: 'Production intelligence', title: 'Costing & profitability',
-    description: 'Review material, packaging, labour and direct-cost totals against saleable output.',
-    endpoint: '/production/profitability', createLabel: 'View reports',
-    columns: [{ key: 'batch_number', label: 'Batch' }, { key: 'product_name', label: 'Finished product' }, { key: 'batch_cost', label: 'Batch cost', kind: 'money' }, { key: 'unit_cost', label: 'Unit cost', kind: 'money' }, { key: 'gross_profit', label: 'Gross profit', kind: 'money' }],
-    empty: 'Costing appears here once a production batch has been completed.',
-  },
-}
+type Row = Record<string, unknown>
+type Product = { id: number; name: string; kind: 'raw_material' | 'packaging' | 'finished_good'; base_unit: string }
+type Unit = { id: number; name: string; symbol: string }
+type Recipe = { id: number; name: string }
 
 const route = useRoute()
-const workspace = computed(() => WORKSPACES[String(route.name)] ?? WORKSPACES['raw-materials']!)
-const rows = ref<Record<string, unknown>[]>([])
-const loading = ref(false)
-const error = ref('')
+const mode = computed(() => String(route.name))
+const config = computed(() => ({
+  'raw-materials': { eyebrow: 'Production inventory', title: 'Raw materials & packaging', endpoint: '/products?kind=raw_material,packaging', action: 'Add input', empty: 'Add ingredients, bottles, caps, labels, and other production inputs.' },
+  recipes: { eyebrow: 'Production planning', title: 'Recipes & BOMs', endpoint: '/recipes?status=active', action: 'Create recipe', empty: 'Create a recipe to define expected yield and ingredients.' },
+  batches: { eyebrow: 'Production operations', title: 'Production batches', endpoint: '/production/batches', action: 'Plan batch', empty: 'Plan a batch from a recipe. Stock only changes when it is completed.' },
+  traceability: { eyebrow: 'Quality & traceability', title: 'Batch & expiry traceability', endpoint: '/production/batches?status=completed', action: 'Refresh', empty: 'Completed production batches will show their output and expiry dates here.' },
+  profitability: { eyebrow: 'Production intelligence', title: 'Costing & profitability', endpoint: '/reports/production', action: 'Refresh report', empty: 'Complete a production batch to see cost and output performance.' },
+}[mode.value] ?? { eyebrow: 'Production', title: 'Production', endpoint: '/production/batches', action: 'Refresh', empty: 'No records yet.' }))
 
-function display(value: unknown, kind?: 'money' | 'quantity') {
-  if (value === null || value === undefined || value === '') return '—'
-  if (kind === 'money') return formatUgx(Number(value))
-  if (kind === 'quantity') return formatQuantity(Number(value))
-  return String(value)
-}
-
-async function load() {
-  loading.value = true
-  error.value = ''
-  try {
-    const response = await apiFetch<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]>(workspace.value.endpoint)
-    rows.value = Array.isArray(response) ? response : (response.data ?? [])
-  } catch (e) {
-    error.value = apiErrorMessage(e)
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(load)
+const rows = ref<Row[]>([]); const report = ref<Row | null>(null); const loading = ref(false); const error = ref(''); const notice = ref(''); const showForm = ref(false); const saving = ref(false); const errors = ref<Record<string, string>>({}); const units = ref<Unit[]>([]); const products = ref<Product[]>([]); const recipes = ref<Recipe[]>([])
+const materialForm = reactive({ name: '', kind: 'raw_material' as Product['kind'], base_unit: '', low_stock_threshold: 0, current_cost: 0, shelf_life_days: null as number | null })
+const recipeForm = reactive({ name: '', family: '', yield_quantity: 0, yield_unit: '', instructions: '', items: [{ product_id: '', quantity: 0, note: '' }] })
+const batchForm = reactive({ recipe_id: '', planned_yield: 0, production_date: localDate(), expiry_date: '', notes: '', outputs: [{ product_id: '', quantity: 0 }] })
+const inputProducts = computed(() => products.value.filter((p) => p.kind !== 'finished_good')); const finishedProducts = computed(() => products.value.filter((p) => p.kind === 'finished_good'))
+const columns = computed(() => mode.value === 'raw-materials' ? [['name','Input'],['kind','Type'],['base_unit','Unit'],['stock','In stock'],['low_stock_threshold','Reorder level']] : mode.value === 'recipes' ? [['name','Recipe'],['family','Family'],['yield_quantity','Yield'],['yield_unit','Unit'],['estimated_cost','Estimated cost']] : [['batch_number','Batch'],['name','Production'],['status','Status'],['production_date','Date'],['output_quantity','Output'],['total_cost','Cost']])
+function listFrom(response: unknown): Row[] { if (Array.isArray(response)) return response as Row[]; const o = response as { data?: Row[]; records?: { data?: Row[] }; batches?: Row[] }; return o.data ?? o.records?.data ?? o.batches ?? [] }
+function cell(row: Row, key?: string) { if (!key) return '—'; const v = row[key]; if (v === null || v === undefined || v === '') return '—'; if (key.includes('cost') || key.includes('price')) return formatUgx(Number(v)); if (['stock','yield_quantity','output_quantity','planned_yield'].includes(key)) return formatQuantity(Number(v)); return String(v) }
+async function loadReferences() { try { const [u,p,r] = await Promise.all([productionApi.measurementUnits.list(), productionApi.products.list('raw_material,packaging,finished_good'), productionApi.recipes.list({ status: 'active' })]); units.value = u; products.value = p.data as Product[]; recipes.value = r.data as Recipe[] } catch {} }
+async function load() { loading.value = true; error.value = ''; try { if (mode.value === 'raw-materials') rows.value = (await productionApi.products.list('raw_material,packaging')).data as unknown as Row[]; else if (mode.value === 'recipes') rows.value = (await productionApi.recipes.list({ status: 'active' })).data as unknown as Row[]; else if (mode.value === 'profitability') { const response = await productionApi.reports.production(); report.value = response as unknown as Row; rows.value = response.batches as unknown as Row[] } else rows.value = (await productionApi.batches.list({ status: mode.value === 'traceability' ? 'completed' : undefined })).data as unknown as Row[] } catch (e) { error.value = apiErrorMessage(e) } finally { loading.value = false } }
+function openForm() { errors.value = {}; showForm.value = true }; function addRecipeItem() { recipeForm.items.push({ product_id: '', quantity: 0, note: '' }) }; function addBatchOutput() { batchForm.outputs.push({ product_id: '', quantity: 0 }) }
+async function save() { saving.value = true; errors.value = {}; try { if (mode.value === 'raw-materials') await productionApi.products.create({ ...materialForm, selling_price: 0, shelf_life_days: materialForm.shelf_life_days || null }); else if (mode.value === 'recipes') await productionApi.recipes.create({ name: recipeForm.name, family: recipeForm.family || null, yield_quantity: Number(recipeForm.yield_quantity), yield_unit: recipeForm.yield_unit, instructions: recipeForm.instructions || null, items: recipeForm.items.filter((i) => i.product_id).map((i) => ({ product_id: Number(i.product_id), quantity: Number(i.quantity), note: i.note || null })) }); else await productionApi.batches.create({ recipe_id: Number(batchForm.recipe_id), planned_yield: Number(batchForm.planned_yield), production_date: batchForm.production_date, expiry_date: batchForm.expiry_date || null, notes: batchForm.notes || null, idempotency_key: uuid(), outputs: batchForm.outputs.filter((i) => i.product_id).map((i) => ({ product_id: Number(i.product_id), quantity: Number(i.quantity) })) }); showForm.value = false; notice.value = mode.value === 'batches' ? 'Draft batch planned. Complete it when actual inputs and outputs are known.' : 'Saved successfully.'; await load() } catch (e) { errors.value = fieldErrors(e); error.value = Object.keys(errors.value).length ? 'Please fix the highlighted fields.' : apiErrorMessage(e) } finally { saving.value = false } }
+async function completeBatch(batch: Row) { const id = Number(batch.id); if (!id || !window.confirm(`Complete ${String(batch.batch_number ?? 'this batch')} using its planned inputs and outputs? This posts the stock movements and freezes cost.`)) return; saving.value = true; error.value = ''; try { await productionApi.batches.complete(id, {}); notice.value = `${String(batch.batch_number ?? 'Batch')} completed and stock was updated.`; await load() } catch (e) { error.value = apiErrorMessage(e) } finally { saving.value = false } }
+onMounted(async () => { await Promise.all([load(), loadReferences()]) })
 </script>
 
 <template>
-  <main class="page">
-    <header class="page-head">
-      <div>
-        <p class="eyebrow">{{ workspace.eyebrow }}</p>
-        <h1>{{ workspace.title }}</h1>
-        <p class="intro">{{ workspace.description }}</p>
-      </div>
-      <button type="button" class="btn btn-primary" disabled :title="`${workspace.createLabel} is enabled when the Production API is connected`">
-        {{ workspace.createLabel }}
-      </button>
-    </header>
-
-    <p v-if="error" class="alert-danger" role="alert">{{ error }}</p>
-    <section class="card table-card">
-      <div class="table-head">
-        <p>Live production data</p>
-        <button type="button" class="link" :disabled="loading" @click="load">{{ loading ? 'Refreshing…' : 'Refresh' }}</button>
-      </div>
-      <p v-if="loading && !rows.length" class="ui-state">Loading production data…</p>
-      <p v-else-if="!rows.length" class="ui-state">{{ workspace.empty }}</p>
-      <div v-else class="table-scroll">
-        <table>
-          <thead><tr><th v-for="column in workspace.columns" :key="column.key">{{ column.label }}</th></tr></thead>
-          <tbody><tr v-for="(row, index) in rows" :key="String(row.id ?? index)"><td v-for="column in workspace.columns" :key="column.key">{{ display(row[column.key], column.kind) }}</td></tr></tbody>
-        </table>
-      </div>
-    </section>
-    <p class="note">This screen is ready for the Production API contract and does not alter retail inventory, sales, customer, or staff data.</p>
+  <main class="ui-page">
+    <header class="ui-head"><div><p class="ui-eyebrow">{{ config.eyebrow }}</p><h1>{{ config.title }}</h1></div><button v-if="mode === 'raw-materials' || mode === 'recipes' || mode === 'batches'" type="button" class="btn btn-primary" @click="openForm">{{ config.action }}</button><button v-else type="button" class="btn btn-primary" :disabled="loading" @click="load">{{ loading ? 'Refreshing…' : config.action }}</button></header>
+    <p v-if="notice" class="notice" role="status">{{ notice }}</p><p v-if="error" class="alert-danger" role="alert">{{ error }}</p>
+    <section v-if="mode === 'profitability' && report" class="report-grid"><div v-for="([key,label]) in [['batches','Completed batches'],['total_cost','Production cost'],['wastage_cost','Wastage cost'],['drafts','Draft batches']]" :key="key" class="card metric"><span>{{ label }}</span><strong>{{ key.includes('cost') ? formatUgx(Number((report.summary as Row)?.[key] ?? 0)) : (report.summary as Row)?.[key] ?? 0 }}</strong></div></section>
+    <section class="card ui-table-card"><p v-if="loading && !rows.length" class="ui-state">Loading…</p><p v-else-if="!rows.length" class="ui-state">{{ config.empty }}</p><div v-else class="ui-table-scroll"><table class="ui-table"><thead><tr><th v-for="column in columns" :key="column[0]">{{ column[1] }}</th><th v-if="mode === 'batches'" /></tr></thead><tbody><tr v-for="(row,index) in rows" :key="String(row.id ?? index)"><td v-for="column in columns" :key="column[0]">{{ cell(row,column[0]) }}</td><td v-if="mode === 'batches'"><button v-if="row.status === 'draft'" type="button" class="link" :disabled="saving" @click="completeBatch(row)">Complete</button></td></tr></tbody></table></div></section>
+    <BaseModal v-if="showForm" :title="config.action" @close="showForm = false"><form class="form" @submit.prevent="save"><p v-if="error" class="alert-danger">{{ error }}</p>
+      <template v-if="mode === 'raw-materials'"><div class="field"><label>Name</label><input v-model="materialForm.name" required autofocus><span v-if="errors.name" class="field-error">{{ errors.name }}</span></div><div class="row"><div class="field"><label>Type</label><select v-model="materialForm.kind"><option value="raw_material">Raw material</option><option value="packaging">Packaging</option></select></div><div class="field"><label>Base unit</label><select v-model="materialForm.base_unit" required><option value="" disabled>Select unit</option><option v-for="unit in units" :key="unit.id" :value="unit.symbol">{{ unit.name }} ({{ unit.symbol }})</option></select></div></div><div class="row"><div class="field"><label>Current cost (UGX)</label><input v-model.number="materialForm.current_cost" type="number" min="0" required></div><div class="field"><label>Low-stock level</label><input v-model.number="materialForm.low_stock_threshold" type="number" min="0" step="any"></div></div><div class="field"><label>Shelf life (days, optional)</label><input v-model.number="materialForm.shelf_life_days" type="number" min="1"></div></template>
+      <template v-else-if="mode === 'recipes'"><div class="field"><label>Recipe name</label><input v-model="recipeForm.name" required autofocus></div><div class="row"><div class="field"><label>Family</label><input v-model="recipeForm.family" placeholder="Mango Juice"></div><div class="field"><label>Yield</label><input v-model.number="recipeForm.yield_quantity" type="number" min="0.001" step="any" required></div></div><div class="field"><label>Yield unit</label><select v-model="recipeForm.yield_unit" required><option value="" disabled>Select unit</option><option v-for="unit in units" :key="unit.id" :value="unit.symbol">{{ unit.name }} ({{ unit.symbol }})</option></select></div><fieldset><legend>Ingredients and packaging</legend><div v-for="(item,index) in recipeForm.items" :key="index" class="line"><select v-model="item.product_id" required><option value="" disabled>Select input</option><option v-for="product in inputProducts" :key="product.id" :value="String(product.id)">{{ product.name }} ({{ product.base_unit }})</option></select><input v-model.number="item.quantity" type="number" min="0.001" step="any" placeholder="Quantity" required><button type="button" class="link" @click="recipeForm.items.splice(index,1)">Remove</button></div><button type="button" class="link" @click="addRecipeItem">+ Add input</button></fieldset><div class="field"><label>Instructions (optional)</label><textarea v-model="recipeForm.instructions" rows="3" /></div></template>
+      <template v-else><div class="field"><label>Recipe</label><select v-model="batchForm.recipe_id" required autofocus><option value="" disabled>Select recipe</option><option v-for="recipe in recipes" :key="recipe.id" :value="String(recipe.id)">{{ recipe.name }}</option></select></div><div class="row"><div class="field"><label>Planned yield</label><input v-model.number="batchForm.planned_yield" type="number" min="0.001" step="any" required></div><div class="field"><label>Production date</label><input v-model="batchForm.production_date" type="date" required></div></div><div class="field"><label>Batch expiry date (optional)</label><input v-model="batchForm.expiry_date" type="date"></div><fieldset><legend>Planned outputs</legend><div v-for="(item,index) in batchForm.outputs" :key="index" class="line"><select v-model="item.product_id" required><option value="" disabled>Select finished product</option><option v-for="product in finishedProducts" :key="product.id" :value="String(product.id)">{{ product.name }}</option></select><input v-model.number="item.quantity" type="number" min="0.001" step="any" placeholder="Quantity" required><button type="button" class="link" @click="batchForm.outputs.splice(index,1)">Remove</button></div><button type="button" class="link" @click="addBatchOutput">+ Add output size</button></fieldset><div class="field"><label>Notes (optional)</label><textarea v-model="batchForm.notes" rows="3" /></div></template>
+      <button type="submit" class="btn btn-primary btn-block" :disabled="saving">{{ saving ? 'Saving…' : config.action }}</button></form></BaseModal>
   </main>
 </template>
 
 <style scoped>
-.page { flex: 1; width: 100%; max-width: 1680px; margin: 0 auto; padding: 2rem; display: flex; flex-direction: column; gap: 1.25rem; }
-.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
-.eyebrow { font-size: .75rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-primary); }
-h1 { margin-top: .25rem; font-size: 1.5rem; }
-.intro { max-width: 42rem; margin-top: .5rem; color: var(--color-ink-soft); }
-.table-card { overflow: hidden; }
-.table-head { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--color-border); font-size: .875rem; font-weight: 600; }
-.link { border: 0; background: transparent; color: var(--color-primary); cursor: pointer; font: inherit; }
-.link:disabled { opacity: .55; cursor: wait; }
-.table-scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
-th, td { padding: .875rem 1.25rem; border-bottom: 1px solid var(--color-border); text-align: left; white-space: nowrap; }
-th { color: var(--color-ink-faint); font-size: .6875rem; letter-spacing: .04em; text-transform: uppercase; }
-tbody tr:last-child td { border-bottom: 0; }
-.note { color: var(--color-ink-faint); font-size: .8125rem; }
-@media (max-width: 720px) { .page { padding: 1.25rem 1rem; } .page-head { align-items: stretch; flex-direction: column; } .page-head .btn { width: 100%; min-height: 44px; } }
+.notice{padding:.625rem .75rem;border-radius:var(--radius-sm);background:var(--color-primary-soft);color:var(--color-primary)}.report-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}.metric{padding:1rem}.metric span{display:block;color:var(--color-ink-faint);font-size:.8rem}.metric strong{display:block;margin-top:.25rem;font-size:1.25rem}.form{display:flex;flex-direction:column;gap:1rem}.row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}fieldset{display:flex;flex-direction:column;gap:.5rem;padding:.75rem;border:1px solid var(--color-border);border-radius:var(--radius-sm)}legend{padding:0 .25rem;font-size:.8125rem;color:var(--color-ink-soft)}.line{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:.5rem;align-items:center}.line select,.line input,textarea{width:100%;padding:.625rem .75rem;border:1px solid var(--color-border-strong);border-radius:var(--radius-sm);background:var(--color-surface);color:var(--color-ink)}.link{border:0;background:transparent;padding:0;cursor:pointer;text-align:left}@media(max-width:720px){.report-grid,.row{grid-template-columns:1fr}.line{grid-template-columns:1fr}.line .link{min-height:36px}}
 </style>

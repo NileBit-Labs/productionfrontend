@@ -17,6 +17,11 @@ export interface ManagedProduct {
   is_out: boolean
   is_low: boolean
   units: ProductUnit[]
+  kind?: 'raw_material' | 'packaging' | 'finished_good'
+  family?: string | null
+  size_label?: string | null
+  output_equivalent?: number | null
+  shelf_life_days?: number | null
 }
 
 export interface Category {

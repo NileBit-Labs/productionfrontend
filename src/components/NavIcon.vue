@@ -58,6 +58,10 @@ defineProps<{ name: string }>()
       <path d="M9 17c.7.7 1.6 1 3 1" />
     </template>
 
+    <template v-else-if="name === 'wastage'">
+      <path d="M4 4l16 16M6 18c1.7-4 4.1-6.6 7.1-7.6 1.5-.5 3.2-.7 4.9-.5-.2 1.7-.8 3.4-1.8 4.8C14.1 17.5 10.8 18.6 6 18z" />
+    </template>
+
     <template v-else-if="name === 'purchases'">
       <rect x="2" y="8" width="12" height="9" rx="1" />
       <path d="M14 11h4l4 3v3h-8z" />

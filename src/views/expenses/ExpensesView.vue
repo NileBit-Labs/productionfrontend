@@ -6,6 +6,8 @@ import ResponsiveDataView from '@/components/ResponsiveDataView.vue'
 import { useClientPage } from '@/lib/paging'
 import { apiErrorMessage, apiFetch } from '@/lib/api'
 import { formatUgx, localDate } from '@/lib/format'
+import { productionApi } from '@/lib/production'
+import type { ExpenseCategory, ProductionBatch } from '@/types/production'
 
 interface Expense {
   id: number
@@ -13,6 +15,8 @@ interface Expense {
   amount: number
   description: string | null
   expense_date: string
+  type?: 'operating' | 'direct_labour' | 'direct_production'
+  production_batch_id?: number | null
   recorder?: { id: number; name: string }
 }
 
@@ -22,6 +26,8 @@ interface ExpenseList {
   total: number
   by_category: { category: string; total: number }[]
   categories: string[]
+  operating_total?: number
+  direct_total?: number
   data: Expense[]
 }
 
@@ -34,10 +40,13 @@ const error = ref('')
 const from = ref(monthStart)
 const to = ref(today)
 const category = ref('')
+const type = ref('')
+const configuredCategories = ref<ExpenseCategory[]>([])
+const draftBatches = ref<ProductionBatch[]>([])
 
 const editing = ref<Expense | null>(null)
 const adding = ref(false)
-const form = ref({ category: 'Other', amount: 0, description: '', expense_date: today })
+const form = ref({ category: 'Other', amount: 0, description: '', expense_date: today, type: 'operating' as 'operating' | 'direct_labour' | 'direct_production', production_batch_id: '' as number | '' })
 const saving = ref(false)
 const formError = ref('')
 
@@ -52,6 +61,7 @@ async function load() {
   try {
     const params = new URLSearchParams({ from: from.value, to: to.value })
     if (category.value) params.set('category', category.value)
+    if (type.value) params.set('type', type.value)
     list.value = await apiFetch<ExpenseList>(`/expenses?${params}`)
     page.value = 1
   } catch (e) {
@@ -63,7 +73,7 @@ async function load() {
 
 function openAdd() {
   editing.value = null
-  form.value = { category: 'Other', amount: 0, description: '', expense_date: today }
+  form.value = { category: configuredCategories.value[0]?.name ?? 'Other', amount: 0, description: '', expense_date: today, type: configuredCategories.value[0]?.default_type ?? 'operating', production_batch_id: '' }
   formError.value = ''
   adding.value = true
 }
@@ -75,6 +85,8 @@ function openEdit(expense: Expense) {
     amount: expense.amount,
     description: expense.description ?? '',
     expense_date: expense.expense_date,
+    type: expense.type ?? 'operating',
+    production_batch_id: expense.production_batch_id ?? '',
   }
   formError.value = ''
   adding.value = true
@@ -88,6 +100,8 @@ async function save() {
       ...form.value,
       amount: Math.round(Number(form.value.amount)),
       description: form.value.description || null,
+      type: form.value.type,
+      production_batch_id: form.value.type === 'operating' || form.value.production_batch_id === '' ? null : Number(form.value.production_batch_id),
     }
     if (editing.value) {
       await apiFetch(`/expenses/${editing.value.id}`, { method: 'PATCH', body })
@@ -103,7 +117,13 @@ async function save() {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await Promise.all([
+    load(),
+    productionApi.expenseCategories.list().then((items) => (configuredCategories.value = items)).catch(() => undefined),
+    productionApi.batches.list({ status: 'draft' }).then((page) => (draftBatches.value = page.data)).catch(() => undefined),
+  ])
+})
 </script>
 
 <template>
@@ -126,6 +146,15 @@ onMounted(load)
         <input id="to" v-model="to" type="date" :max="today" @change="load" />
       </div>
       <div class="field">
+        <label for="expense-type">Type</label>
+        <select id="expense-type" v-model="type" @change="load">
+          <option value="">All types</option>
+          <option value="operating">Operating</option>
+          <option value="direct_labour">Direct labour</option>
+          <option value="direct_production">Direct production</option>
+        </select>
+      </div>
+      <div class="field">
         <label for="cat">Category</label>
         <select id="cat" v-model="category" @change="load">
           <option value="">All</option>
@@ -141,6 +170,11 @@ onMounted(load)
         <p class="label">Total spent</p>
         <p class="value">{{ formatUgx(list.total) }}</p>
         <p class="hint">{{ list.data.length }} expense{{ list.data.length === 1 ? '' : 's' }}</p>
+      </div>
+      <div class="card total">
+        <p class="label">Direct production cost</p>
+        <p class="value">{{ formatUgx(list.direct_total ?? 0) }}</p>
+        <p class="hint">Included in batch cost, not operating expenses</p>
       </div>
 
       <div class="card breakdown">
@@ -231,8 +265,24 @@ onMounted(load)
         <div class="field">
           <label for="e-cat">Category</label>
           <select id="e-cat" v-model="form.category">
-            <option v-for="c in list?.categories ?? ['Other']" :key="c" :value="c">{{ c }}</option>
+            <option v-for="c in configuredCategories.length ? configuredCategories : (list?.categories ?? ['Other'])" :key="typeof c === 'string' ? c : c.id" :value="typeof c === 'string' ? c : c.name">{{ typeof c === 'string' ? c : c.name }}</option>
           </select>
+        </div>
+        <div class="field">
+          <label for="e-type">Expense type</label>
+          <select id="e-type" v-model="form.type">
+            <option value="operating">Operating</option>
+            <option value="direct_labour">Direct labour</option>
+            <option value="direct_production">Direct production</option>
+          </select>
+        </div>
+        <div v-if="form.type !== 'operating'" class="field">
+          <label for="e-batch">Draft production batch</label>
+          <select id="e-batch" v-model="form.production_batch_id" required>
+            <option value="" disabled>Select draft batch</option>
+            <option v-for="batch in draftBatches" :key="batch.id" :value="batch.id">{{ batch.batch_number }} — {{ batch.name }}</option>
+          </select>
+          <span class="hint">Direct expenses are included in the selected batch cost.</span>
         </div>
         <div class="field">
           <label for="e-amount">Amount (UGX)</label>

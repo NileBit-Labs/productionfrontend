@@ -22,6 +22,7 @@ const search = ref('')
 const categoryId = ref('')
 const status = ref<'active' | 'archived' | 'all'>('active')
 const stockFilter = ref<'' | 'low' | 'out'>('')
+const kind = ref('')
 const pageNo = ref(1)
 const perPage = usePerPage('products')
 
@@ -43,6 +44,7 @@ async function load() {
     if (categoryId.value) params.set('category_id', categoryId.value)
     if (stockFilter.value === 'low') params.set('low_stock', '1')
     if (stockFilter.value === 'out') params.set('out_of_stock', '1')
+    if (kind.value) params.set('kind', kind.value)
     page.value = await apiFetch<Paginated<ManagedProduct>>(`/products?${params}`)
   } catch (e) {
     error.value = apiErrorMessage(e)
@@ -135,6 +137,15 @@ onMounted(() => {
           <option v-for="c in categories.list" :key="c.id" :value="String(c.id)">
             {{ c.name }}
           </option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="pf-kind">Product role</label>
+        <select id="pf-kind" v-model="kind" @change="refilter">
+          <option value="">All roles</option>
+          <option value="finished_good">Finished goods</option>
+          <option value="raw_material">Raw materials</option>
+          <option value="packaging">Packaging</option>
         </select>
       </div>
       <div class="field">

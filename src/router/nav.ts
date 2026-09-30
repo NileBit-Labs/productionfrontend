@@ -61,6 +61,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Raw materials', to: '/production/raw-materials', icon: 'inventory', owner: 'Collins — Frontend / Product UX', ready: true, managerOnly: true },
       { label: 'Recipes & BOMs', to: '/production/recipes', icon: 'recipes', owner: 'Collins — Frontend / Product UX', ready: true, managerOnly: true },
       { label: 'Production batches', to: '/production/batches', icon: 'batches', owner: 'Collins — Frontend / Product UX', ready: true, managerOnly: true },
+      { label: 'Wastage', to: '/production/wastage', icon: 'wastage', owner: 'Collins — Frontend / Product UX', ready: true, managerOnly: true },
       { label: 'Batch traceability', to: '/production/traceability', icon: 'traceability', owner: 'Collins — Frontend / Product UX', ready: true, managerOnly: true },
       { label: 'Costing & profitability', to: '/production/profitability', icon: 'reports', owner: 'Collins — Frontend / Product UX', ready: true, managerOnly: true },
     ],

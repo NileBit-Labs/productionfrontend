@@ -28,7 +28,7 @@ function unlockPageScroll() {
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 
-defineProps<{ title: string }>()
+defineProps<{ title: string; wide?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const modal = ref<HTMLElement | null>(null)
@@ -108,6 +108,7 @@ onUnmounted(() => {
     <div
       ref="modal"
       class="modal card"
+      :class="{ 'modal-wide': wide }"
       role="dialog"
       aria-modal="true"
       :aria-labelledby="titleId"
@@ -144,6 +145,10 @@ onUnmounted(() => {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 1.5rem;
+}
+
+.modal-wide {
+  max-width: 960px;
 }
 
 .modal-head {

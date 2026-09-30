@@ -5,6 +5,7 @@ import { apiErrorMessage, apiFetch } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import { useShopStore, type Shop } from '@/stores/shop'
 import { useThemeStore, type Theme } from '@/stores/theme'
+import { PRODUCTION_BUSINESS_TYPES } from '@/lib/businessTypes'
 
 const auth = useAuthStore()
 const shopStore = useShopStore()
@@ -97,13 +98,13 @@ async function changePassword() {
 
     <section class="card block">
       <div class="block-head">
-        <h2>Shop</h2>
+        <h2>Production location</h2>
         <p v-if="!auth.isOwner" class="hint">Only the owner can change these details.</p>
       </div>
 
       <form class="grid" @submit.prevent="saveShop">
         <div class="field">
-          <label for="shop-name">Shop name</label>
+          <label for="shop-name">Outlet / production location name</label>
           <input
             id="shop-name"
             v-model="shopForm.name"
@@ -113,14 +114,17 @@ async function changePassword() {
           />
         </div>
         <div class="field">
-          <label for="shop-type">Type of business</label>
-          <input
+          <label for="shop-type">Manufacturing business type</label>
+          <select
             id="shop-type"
             v-model="shopForm.business_type"
-            type="text"
             required
             :disabled="!auth.isOwner"
-          />
+          >
+            <option v-for="type in PRODUCTION_BUSINESS_TYPES" :key="type.value" :value="type.value">
+              {{ type.label }}
+            </option>
+          </select>
         </div>
         <div class="field">
           <label for="shop-phone">Phone</label>
@@ -155,7 +159,7 @@ async function changePassword() {
           <p v-if="shopError" class="alert-danger">{{ shopError }}</p>
           <p v-if="shopSaved" class="saved" role="status">Saved.</p>
           <button type="submit" class="btn btn-primary" :disabled="shopBusy">
-            {{ shopBusy ? 'Saving…' : 'Save shop details' }}
+            {{ shopBusy ? 'Saving…' : 'Save location details' }}
           </button>
         </div>
       </form>

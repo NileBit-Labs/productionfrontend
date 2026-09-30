@@ -1,133 +1,65 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiErrorMessage, apiFetch } from '@/lib/api'
-import { formatQuantity, formatUgx } from '@/lib/format'
+import { formatQuantity, formatUgx, localDate } from '@/lib/format'
 
-type Workspace = {
-  eyebrow: string
-  title: string
-  description: string
-  endpoint: string
-  createLabel: string
-  columns: { key: string; label: string; kind?: 'money' | 'quantity' }[]
-  empty: string
-}
-
-const WORKSPACES: Record<string, Workspace> = {
-  'raw-materials': {
-    eyebrow: 'Production inventory', title: 'Raw materials',
-    description: 'Track ingredients, packaging and measurement units separately from finished goods.',
-    endpoint: '/production/raw-materials', createLabel: 'Add raw material',
-    columns: [{ key: 'name', label: 'Material' }, { key: 'unit', label: 'Unit' }, { key: 'on_hand', label: 'On hand', kind: 'quantity' }, { key: 'reorder_level', label: 'Reorder level', kind: 'quantity' }],
-    empty: 'No raw materials yet. Add the ingredients and packaging used in production.',
-  },
-  recipes: {
-    eyebrow: 'Production planning', title: 'Recipes & BOMs',
-    description: 'Define the materials and quantities needed to make each finished product.',
-    endpoint: '/production/recipes', createLabel: 'Create recipe',
-    columns: [{ key: 'name', label: 'Recipe' }, { key: 'product_name', label: 'Finished product' }, { key: 'yield_quantity', label: 'Expected yield', kind: 'quantity' }, { key: 'ingredients_count', label: 'Ingredients', kind: 'quantity' }],
-    empty: 'No recipes yet. Create a bill of materials before recording a batch.',
-  },
-  batches: {
-    eyebrow: 'Production operations', title: 'Production batches',
-    description: 'Record production, actual consumption, output, wastage, and batch traceability.',
-    endpoint: '/production/batches', createLabel: 'Start batch',
-    columns: [{ key: 'batch_number', label: 'Batch' }, { key: 'recipe_name', label: 'Recipe' }, { key: 'status', label: 'Status' }, { key: 'production_date', label: 'Produced' }, { key: 'saleable_output', label: 'Saleable output', kind: 'quantity' }],
-    empty: 'No batches recorded. Start a batch once a recipe is ready.',
-  },
-  traceability: {
-    eyebrow: 'Quality & traceability', title: 'Batch & expiry traceability',
-    description: 'Find finished goods by batch number, production date, and expiry date.',
-    endpoint: '/production/traceability', createLabel: 'View batches',
-    columns: [{ key: 'batch_number', label: 'Batch' }, { key: 'product_name', label: 'Finished product' }, { key: 'produced_at', label: 'Produced' }, { key: 'expires_at', label: 'Expires' }, { key: 'quantity', label: 'Available', kind: 'quantity' }],
-    empty: 'No traceable finished-goods batches are available yet.',
-  },
-  profitability: {
-    eyebrow: 'Production intelligence', title: 'Costing & profitability',
-    description: 'Review material, packaging, labour and direct-cost totals against saleable output.',
-    endpoint: '/production/profitability', createLabel: 'View reports',
-    columns: [{ key: 'batch_number', label: 'Batch' }, { key: 'product_name', label: 'Finished product' }, { key: 'batch_cost', label: 'Batch cost', kind: 'money' }, { key: 'unit_cost', label: 'Unit cost', kind: 'money' }, { key: 'gross_profit', label: 'Gross profit', kind: 'money' }],
-    empty: 'Costing appears here once a production batch has been completed.',
-  },
-}
+type Product = { id: number; name: string; kind: string; base_unit: string; stock: number; family?: string | null; size_label?: string | null; output_equivalent?: number | null; shelf_life_days?: number | null; selling_price: number; current_cost: number }
+type RecipeItem = { product_id: number; quantity: number; note?: string }
+type Recipe = { id: number; name: string; family?: string | null; yield_quantity: number; yield_unit: string; instructions?: string | null; status: string; items: RecipeItem[] }
+type BatchLine = { product_id: number; quantity: number; output_equivalent?: number; expiry_date?: string }
+type Batch = { id: number; batch_number: string; name: string; status: string; recipe?: { id: number; name: string } | null; production_date: string; expiry_date?: string | null; total_cost: number; output_quantity: number; outputs: Array<{ product_id: number; product_name: string; quantity: number; unit_cost?: number; lot_id?: number; remaining_quantity?: number; expiry_date?: string | null }>; inputs?: Array<{ product_id: number; product_name: string; actual_quantity?: number | null; planned_quantity?: number | null; unit: string }>; costs?: Record<string, number> }
+type Page<T> = { data: T[] }
+type Unit = { id: number; name: string; symbol: string; dimension: string }
 
 const route = useRoute()
-const workspace = computed(() => WORKSPACES[String(route.name)] ?? WORKSPACES['raw-materials']!)
-const rows = ref<Record<string, unknown>[]>([])
-const loading = ref(false)
-const error = ref('')
-
-function display(value: unknown, kind?: 'money' | 'quantity') {
-  if (value === null || value === undefined || value === '') return '—'
-  if (kind === 'money') return formatUgx(Number(value))
-  if (kind === 'quantity') return formatQuantity(Number(value))
-  return String(value)
-}
-
-async function load() {
-  loading.value = true
-  error.value = ''
-  try {
-    const response = await apiFetch<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]>(workspace.value.endpoint)
-    rows.value = Array.isArray(response) ? response : (response.data ?? [])
-  } catch (e) {
-    error.value = apiErrorMessage(e)
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(load)
+const section = computed(() => String(route.name))
+const title = computed(() => ({ 'raw-materials': 'Materials & finished goods', recipes: 'Recipes & BOMs', batches: 'Production batches', traceability: 'Batch & expiry traceability', profitability: 'Production costing & profitability' }[section.value] ?? 'Production'))
+const loading = ref(false); const saving = ref(false); const error = ref(''); const notice = ref('')
+const products = ref<Product[]>([]); const recipes = ref<Recipe[]>([]); const batches = ref<Batch[]>([]); const units = ref<Unit[]>([]); const report = ref<Record<string, unknown> | null>(null)
+const selectedBatch = ref<Batch | null>(null); const productKind = ref<'raw_material' | 'packaging' | 'finished_good'>('raw_material'); const showForm = ref(false); const editingProduct = ref<Product | null>(null); const editingRecipe = ref<Recipe | null>(null)
+const productForm = reactive({ name: '', kind: 'raw_material', base_unit: 'piece', selling_price: 0, current_cost: 0, low_stock_threshold: 0, opening_stock: 0, family: '', size_label: '', output_equivalent: null as number | null, shelf_life_days: null as number | null })
+const recipeForm = reactive({ name: '', family: '', yield_quantity: 1, yield_unit: 'piece', instructions: '', items: [{ product_id: 0, quantity: 1, note: '' }] as RecipeItem[] })
+const batchForm = reactive({ recipe_id: 0, name: '', production_date: localDate(), expiry_date: '', planned_yield: 1, yield_unit: 'piece', notes: '', inputs: [] as Array<{ product_id: number; actual_quantity: number }>, outputs: [] as BatchLine[], direct_expenses: [] as Array<{ type: 'direct_labour' | 'direct_production'; category: string; amount: number; description: string }>, wastage: [] as Array<{ product_id: number; quantity: number; reason: string }> })
+const unitForm = reactive({ name: '', symbol: '', dimension: 'count' }); const wastageForm = reactive({ product_id: 0, quantity: 1, reason: '', wastage_date: localDate() })
+const materialProducts = computed(() => products.value.filter((p) => p.kind === 'raw_material' || p.kind === 'packaging')); const finishedProducts = computed(() => products.value.filter((p) => p.kind === 'finished_good')); const currentProducts = computed(() => products.value.filter((p) => p.kind === productKind.value))
+function resetProduct() { Object.assign(productForm, { name: '', kind: productKind.value, base_unit: units.value[0]?.symbol ?? 'piece', selling_price: 0, current_cost: 0, low_stock_threshold: 0, opening_stock: 0, family: '', size_label: '', output_equivalent: null, shelf_life_days: null }); editingProduct.value = null }
+function resetRecipe() { Object.assign(recipeForm, { name: '', family: '', yield_quantity: 1, yield_unit: units.value[0]?.symbol ?? 'piece', instructions: '', items: [{ product_id: materialProducts.value[0]?.id ?? 0, quantity: 1, note: '' }] }); editingRecipe.value = null }
+function resetBatch() { Object.assign(batchForm, { recipe_id: recipes.value[0]?.id ?? 0, name: '', production_date: localDate(), expiry_date: '', planned_yield: 1, yield_unit: units.value[0]?.symbol ?? 'piece', notes: '', inputs: [], outputs: [], direct_expenses: [], wastage: [] }) }
+async function loadProducts() { products.value = (await apiFetch<Page<Product>>('/products?status=active&per_page=100')).data }
+async function loadRecipes() { recipes.value = (await apiFetch<Page<Recipe>>('/recipes?status=all&per_page=100')).data }
+async function loadBatches() { batches.value = (await apiFetch<Page<Batch>>('/production/batches?per_page=100')).data }
+async function load() { loading.value = true; error.value = ''; try { await Promise.all([loadProducts(), loadRecipes(), loadBatches(), apiFetch<Unit[]>('/measurement-units').then((v) => { units.value = v })]); if (section.value === 'profitability') report.value = await apiFetch<Record<string, unknown>>('/reports/production') } catch (e) { error.value = apiErrorMessage(e) } finally { loading.value = false } }
+function openProduct(product?: Product) { showForm.value = true; editingProduct.value = product ?? null; if (product) Object.assign(productForm, product); else resetProduct() }
+async function saveProduct() { saving.value = true; error.value = ''; try { const body = { ...productForm, family: productForm.family || null, size_label: productForm.size_label || null, output_equivalent: productForm.output_equivalent || null, shelf_life_days: productForm.shelf_life_days || null }; await apiFetch(editingProduct.value ? `/products/${editingProduct.value.id}` : '/products', { method: editingProduct.value ? 'PATCH' : 'POST', body }); notice.value = 'Product saved.'; showForm.value = false; await loadProducts() } catch (e) { error.value = apiErrorMessage(e) } finally { saving.value = false } }
+function openRecipe(recipe?: Recipe) { showForm.value = true; editingRecipe.value = recipe ?? null; if (recipe) Object.assign(recipeForm, { ...recipe, family: recipe.family ?? '', instructions: recipe.instructions ?? '', items: recipe.items.map((i) => ({ ...i, note: i.note ?? '' })) }); else resetRecipe() }
+async function saveRecipe() { saving.value = true; error.value = ''; try { const body = { ...recipeForm, family: recipeForm.family || null, instructions: recipeForm.instructions || null, items: recipeForm.items.filter((i) => i.product_id > 0) }; await apiFetch(editingRecipe.value ? `/recipes/${editingRecipe.value.id}` : '/recipes', { method: editingRecipe.value ? 'PATCH' : 'POST', body }); notice.value = 'Recipe saved.'; showForm.value = false; await loadRecipes() } catch (e) { error.value = apiErrorMessage(e) } finally { saving.value = false } }
+function selectRecipe() { const recipe = recipes.value.find((r) => r.id === batchForm.recipe_id); if (!recipe) return; batchForm.name = recipe.name; batchForm.yield_unit = recipe.yield_unit; batchForm.planned_yield = recipe.yield_quantity; batchForm.inputs = recipe.items.map((i) => ({ product_id: i.product_id, actual_quantity: i.quantity })) }
+async function saveBatch(complete = false) { saving.value = true; error.value = ''; try { const body = { ...batchForm, recipe_id: batchForm.recipe_id || null, expiry_date: batchForm.expiry_date || null, inputs: batchForm.inputs.filter((i) => i.product_id > 0), outputs: batchForm.outputs.filter((i) => i.product_id > 0), direct_expenses: batchForm.direct_expenses.filter((i) => i.amount > 0), wastage: batchForm.wastage.filter((i) => i.product_id > 0 && i.quantity > 0) }; const created = await apiFetch<Batch>('/production/batches', { method: 'POST', body: { ...body, inputs: body.inputs.map((i) => ({ product_id: i.product_id, planned_quantity: i.actual_quantity })) } }); const result = complete ? await apiFetch<Batch>(`/production/batches/${created.id}/complete`, { method: 'POST', body: { ...body, idempotency_key: crypto.randomUUID() } }) : created; selectedBatch.value = result; notice.value = complete ? 'Batch completed and lots created.' : 'Draft batch saved.'; showForm.value = false; await loadBatches(); await loadProducts() } catch (e) { error.value = apiErrorMessage(e) } finally { saving.value = false } }
+async function openBatch(batch: Batch) { try { selectedBatch.value = await apiFetch<Batch>(`/production/batches/${batch.id}`) } catch (e) { error.value = apiErrorMessage(e) } }
+async function cancelBatch() { if (!selectedBatch.value || !confirm(`Cancel ${selectedBatch.value.batch_number}? Completed output can only be reversed when its own lots remain untouched.`)) return; try { selectedBatch.value = await apiFetch<Batch>(`/production/batches/${selectedBatch.value.id}/cancel`, { method: 'POST', body: { reason: 'Cancelled by production manager' } }); notice.value = 'Batch cancelled.'; await load() } catch (e) { error.value = apiErrorMessage(e) } }
+async function saveUnit() { try { await apiFetch('/measurement-units', { method: 'POST', body: unitForm }); Object.assign(unitForm, { name: '', symbol: '', dimension: 'count' }); await load(); notice.value = 'Measurement unit saved.' } catch (e) { error.value = apiErrorMessage(e) } }
+async function recordWastage() { try { await apiFetch('/wastage', { method: 'POST', body: { ...wastageForm, idempotency_key: crypto.randomUUID() } }); notice.value = 'Wastage recorded.'; await load() } catch (e) { error.value = apiErrorMessage(e) } }
+function addOutput() { batchForm.outputs.push({ product_id: finishedProducts.value[0]?.id ?? 0, quantity: 1 }) }; function addExpense() { batchForm.direct_expenses.push({ type: 'direct_labour', category: 'Production labour', amount: 0, description: '' }) }; function addWastage() { batchForm.wastage.push({ product_id: materialProducts.value[0]?.id ?? 0, quantity: 1, reason: '' }) }
+function reportSummary(key: string): number { const summary = report.value?.summary; return typeof summary === 'object' && summary !== null && key in summary ? Number((summary as Record<string, unknown>)[key]) : 0 }
+function reportRows(key: string): Record<string, unknown>[] { const value = report.value?.[key]; return Array.isArray(value) ? value as Record<string, unknown>[] : [] }
+watch(section, () => { showForm.value = false; selectedBatch.value = null; void load() }); onMounted(load)
 </script>
 
 <template>
-  <main class="page">
-    <header class="page-head">
-      <div>
-        <p class="eyebrow">{{ workspace.eyebrow }}</p>
-        <h1>{{ workspace.title }}</h1>
-        <p class="intro">{{ workspace.description }}</p>
-      </div>
-      <button type="button" class="btn btn-primary" disabled :title="`${workspace.createLabel} is enabled when the Production API is connected`">
-        {{ workspace.createLabel }}
-      </button>
-    </header>
-
-    <p v-if="error" class="alert-danger" role="alert">{{ error }}</p>
-    <section class="card table-card">
-      <div class="table-head">
-        <p>Live production data</p>
-        <button type="button" class="link" :disabled="loading" @click="load">{{ loading ? 'Refreshing…' : 'Refresh' }}</button>
-      </div>
-      <p v-if="loading && !rows.length" class="ui-state">Loading production data…</p>
-      <p v-else-if="!rows.length" class="ui-state">{{ workspace.empty }}</p>
-      <div v-else class="table-scroll">
-        <table>
-          <thead><tr><th v-for="column in workspace.columns" :key="column.key">{{ column.label }}</th></tr></thead>
-          <tbody><tr v-for="(row, index) in rows" :key="String(row.id ?? index)"><td v-for="column in workspace.columns" :key="column.key">{{ display(row[column.key], column.kind) }}</td></tr></tbody>
-        </table>
-      </div>
-    </section>
-    <p class="note">This screen is ready for the Production API contract and does not alter retail inventory, sales, customer, or staff data.</p>
-  </main>
+  <main class="page"><header class="page-head"><div><p class="eyebrow">NileBit POS for Production</p><h1>{{ title }}</h1><p class="intro">Live, shop-scoped manufacturing operations. All inventory, costs and traceability are recorded by the production API.</p></div><button class="btn btn-primary" type="button" @click="showForm = true; section === 'raw-materials' ? resetProduct() : section === 'recipes' ? resetRecipe() : section === 'batches' ? resetBatch() : load()">{{ section === 'raw-materials' ? 'Add product' : section === 'recipes' ? 'Create recipe' : section === 'batches' ? 'Start batch' : 'Refresh' }}</button></header>
+    <p v-if="error" class="alert-danger" role="alert">{{ error }}</p><p v-if="notice" class="notice" role="status">{{ notice }}</p>
+    <section v-if="section === 'raw-materials'" class="stack"><div class="tabs"><button v-for="kind in ['raw_material','packaging','finished_good']" :key="kind" type="button" :class="{ active: productKind === kind }" @click="productKind = kind as typeof productKind">{{ kind.replace('_', ' ') }}</button></div><div class="card table-card"><p v-if="loading" class="ui-state">Loading products…</p><table v-else><thead><tr><th>Name</th><th>Unit</th><th>On hand</th><th>Cost</th><th>Family / size</th><th /></tr></thead><tbody><tr v-for="p in currentProducts" :key="p.id"><td>{{ p.name }}</td><td>{{ p.base_unit }}</td><td>{{ formatQuantity(p.stock) }}</td><td>{{ formatUgx(p.current_cost) }}</td><td>{{ [p.family, p.size_label].filter(Boolean).join(' · ') || '—' }}</td><td><button class="link" @click="openProduct(p)">Edit</button></td></tr></tbody></table><p v-if="!loading && !currentProducts.length" class="ui-state">No products in this production group yet.</p></div><div class="card form"><h2>Measurement units</h2><div class="row"><input v-model="unitForm.name" placeholder="Name" /><input v-model="unitForm.symbol" placeholder="Symbol" /><select v-model="unitForm.dimension"><option value="count">Count</option><option value="mass">Mass</option><option value="volume">Volume</option><option value="length">Length</option><option value="other">Other</option></select><button class="btn" @click="saveUnit">Add unit</button></div><p class="hint">{{ units.map((u) => `${u.name} (${u.symbol})`).join(' · ') }}</p></div></section>
+    <section v-else-if="section === 'recipes'" class="card table-card"><p v-if="loading" class="ui-state">Loading recipes…</p><table v-else><thead><tr><th>Recipe</th><th>Yield</th><th>Ingredients</th><th>Status</th><th /></tr></thead><tbody><tr v-for="r in recipes" :key="r.id"><td>{{ r.name }}<small v-if="r.family">{{ r.family }}</small></td><td>{{ formatQuantity(r.yield_quantity) }} {{ r.yield_unit }}</td><td>{{ r.items.length }}</td><td>{{ r.status }}</td><td><button class="link" @click="openRecipe(r)">Edit</button></td></tr></tbody></table><p v-if="!loading && !recipes.length" class="ui-state">Create a recipe to plan input consumption.</p></section>
+    <section v-else-if="section === 'batches' || section === 'traceability'" class="stack"><div class="card table-card"><p v-if="loading" class="ui-state">Loading batches…</p><table v-else><thead><tr><th>Batch</th><th>Recipe</th><th>Status</th><th>Produced</th><th>Output</th><th /></tr></thead><tbody><tr v-for="b in batches" :key="b.id"><td>{{ b.batch_number }}</td><td>{{ b.recipe?.name ?? b.name }}</td><td>{{ b.status }}</td><td>{{ b.production_date }}</td><td>{{ formatQuantity(b.output_quantity) }}</td><td><button class="link" @click="openBatch(b)">View</button></td></tr></tbody></table></div><div class="card form"><h2>Record wastage</h2><div class="row"><select v-model.number="wastageForm.product_id"><option :value="0">Choose product</option><option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }}</option></select><input v-model.number="wastageForm.quantity" type="number" min=".001" step="any" /><input v-model="wastageForm.reason" placeholder="Reason" /><button class="btn" @click="recordWastage">Record wastage</button></div></div><article v-if="selectedBatch" class="card detail"><header><h2>{{ selectedBatch.batch_number }} · {{ selectedBatch.status }}</h2><button v-if="selectedBatch.status !== 'cancelled'" class="btn danger" @click="cancelBatch">Cancel batch</button></header><p>{{ selectedBatch.name }} · {{ selectedBatch.production_date }}</p><dl v-if="selectedBatch.costs"><template v-for="(cost, name) in selectedBatch.costs" :key="String(name)"><dt>{{ String(name).replace('_', ' ') }}</dt><dd>{{ formatUgx(Number(cost)) }}</dd></template></dl><h3>Outputs and authoritative lots</h3><ul><li v-for="o in selectedBatch.outputs" :key="o.product_id">{{ o.product_name }}: {{ formatQuantity(o.quantity) }} · lot #{{ o.lot_id ?? 'pending' }} · remaining {{ o.remaining_quantity == null ? '—' : formatQuantity(o.remaining_quantity) }} · expiry {{ o.expiry_date ?? '—' }}</li></ul></article></section>
+    <section v-else class="stack"><div class="report-grid"><article class="card"><small>Completed batches</small><strong>{{ reportSummary('batches') }}</strong></article><article class="card"><small>Batch cost</small><strong>{{ formatUgx(reportSummary('total_cost')) }}</strong></article><article class="card"><small>Production wastage</small><strong>{{ formatUgx(reportSummary('wastage_cost')) }}</strong></article><article class="card"><small>Drafts</small><strong>{{ reportSummary('drafts') }}</strong></article></div><div class="card table-card"><h2>Batch costing</h2><table><thead><tr><th>Batch</th><th>Output</th><th>Batch cost</th><th>Unit cost</th></tr></thead><tbody><tr v-for="row in reportRows('batches')" :key="String(row.id)"><td>{{ row.batch_number }}</td><td>{{ formatQuantity(Number(row.output_quantity)) }} {{ row.yield_unit }}</td><td>{{ formatUgx(Number(row.total_cost)) }}</td><td>{{ formatUgx(Number(row.cost_per_yield_unit)) }}</td></tr></tbody></table></div><div class="card table-card"><h2>Expiry and remaining lots</h2><table><thead><tr><th>Product</th><th>Batch</th><th>Expiry</th><th>Remaining</th></tr></thead><tbody><tr v-for="row in reportRows('expiring')" :key="`${row.batch_id}-${row.product_id}`"><td>{{ row.product_name }}</td><td>{{ row.batch_number }}</td><td>{{ row.expiry_date }}</td><td>{{ formatQuantity(Number(row.remaining_quantity ?? row.estimated_remaining)) }} {{ row.unit }}</td></tr></tbody></table><p v-if="!reportRows('expiring').length" class="ui-state">No production lots are expiring in the next 14 days.</p></div></section>
+    <section v-if="showForm" class="card form modalish"><header><h2>{{ section === 'raw-materials' ? (editingProduct ? 'Edit product' : 'Add production product') : section === 'recipes' ? (editingRecipe ? 'Edit recipe' : 'Create recipe') : 'Start production batch' }}</h2><button class="link" @click="showForm = false">Close</button></header>
+      <form v-if="section === 'raw-materials'" @submit.prevent="saveProduct"><div class="row"><label>Name<input v-model="productForm.name" required /></label><label>Kind<select v-model="productForm.kind"><option value="raw_material">Raw material</option><option value="packaging">Packaging</option><option value="finished_good">Finished good</option></select></label><label>Unit<input v-model="productForm.base_unit" required /></label></div><div class="row"><label>Cost UGX<input v-model.number="productForm.current_cost" type="number" min="0" /></label><label>Selling price UGX<input v-model.number="productForm.selling_price" type="number" min="0" /></label><label>Opening stock<input v-model.number="productForm.opening_stock" type="number" min="0" step="any" /></label></div><div v-if="productForm.kind === 'finished_good'" class="row"><label>Family<input v-model="productForm.family" /></label><label>Size / variant<input v-model="productForm.size_label" /></label><label>Output equivalent<input v-model.number="productForm.output_equivalent" type="number" min=".001" step="any" /></label><label>Shelf life days<input v-model.number="productForm.shelf_life_days" type="number" min="1" /></label></div><button class="btn btn-primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save product' }}</button></form>
+      <form v-else-if="section === 'recipes'" @submit.prevent="saveRecipe"><div class="row"><label>Name<input v-model="recipeForm.name" required /></label><label>Family<input v-model="recipeForm.family" /></label><label>Expected yield<input v-model.number="recipeForm.yield_quantity" type="number" min=".001" step="any" required /></label><label>Yield unit<input v-model="recipeForm.yield_unit" required /></label></div><label>Instructions<textarea v-model="recipeForm.instructions" /></label><h3>Materials and packaging</h3><div v-for="(item, i) in recipeForm.items" :key="i" class="row"><select v-model.number="item.product_id"><option :value="0">Choose input</option><option v-for="p in materialProducts" :key="p.id" :value="p.id">{{ p.name }} ({{ p.base_unit }})</option></select><input v-model.number="item.quantity" type="number" min=".001" step="any" /><input v-model="item.note" placeholder="Note" /><button type="button" class="link" @click="recipeForm.items.splice(i, 1)">Remove</button></div><button type="button" class="btn" @click="recipeForm.items.push({ product_id: materialProducts[0]?.id ?? 0, quantity: 1, note: '' })">Add input</button><button class="btn btn-primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save recipe' }}</button></form>
+      <form v-else @submit.prevent="saveBatch(false)"><div class="row"><label>Recipe<select v-model.number="batchForm.recipe_id" @change="selectRecipe"><option :value="0">No recipe</option><option v-for="r in recipes.filter((r) => r.status === 'active')" :key="r.id" :value="r.id">{{ r.name }}</option></select></label><label>Batch name<input v-model="batchForm.name" required /></label><label>Date<input v-model="batchForm.production_date" type="date" required /></label><label>Expiry / best before<input v-model="batchForm.expiry_date" type="date" /></label></div><div class="row"><label>Planned yield<input v-model.number="batchForm.planned_yield" type="number" min=".001" step="any" /></label><label>Yield unit<input v-model="batchForm.yield_unit" /></label></div><h3>Actual inputs</h3><div v-for="(item, i) in batchForm.inputs" :key="i" class="row"><select v-model.number="item.product_id"><option v-for="p in materialProducts" :key="p.id" :value="p.id">{{ p.name }}</option></select><input v-model.number="item.actual_quantity" type="number" min="0" step="any" /></div><h3>Finished outputs</h3><div v-for="(item, i) in batchForm.outputs" :key="i" class="row"><select v-model.number="item.product_id"><option v-for="p in finishedProducts" :key="p.id" :value="p.id">{{ p.name }}</option></select><input v-model.number="item.quantity" type="number" min=".001" step="any" /><input v-model.number="item.output_equivalent" type="number" min=".001" step="any" placeholder="Output equivalent" /><input v-model="item.expiry_date" type="date" /><button type="button" class="link" @click="batchForm.outputs.splice(i, 1)">Remove</button></div><button type="button" class="btn" @click="addOutput">Add output</button><h3>Direct costs & wastage</h3><div v-for="(item, i) in batchForm.direct_expenses" :key="`e${i}`" class="row"><select v-model="item.type"><option value="direct_labour">Direct labour</option><option value="direct_production">Direct production</option></select><input v-model="item.category" placeholder="Category" /><input v-model.number="item.amount" type="number" min="1" placeholder="UGX" /><button type="button" class="link" @click="batchForm.direct_expenses.splice(i, 1)">Remove</button></div><button type="button" class="btn" @click="addExpense">Add direct cost</button><div v-for="(item, i) in batchForm.wastage" :key="`w${i}`" class="row"><select v-model.number="item.product_id"><option v-for="p in materialProducts" :key="p.id" :value="p.id">{{ p.name }}</option></select><input v-model.number="item.quantity" type="number" min=".001" step="any" /><input v-model="item.reason" placeholder="Reason" /><button type="button" class="link" @click="batchForm.wastage.splice(i, 1)">Remove</button></div><button type="button" class="btn" @click="addWastage">Add wastage</button><label>Notes<textarea v-model="batchForm.notes" /></label><div class="actions"><button class="btn" :disabled="saving">Save draft</button><button type="button" class="btn btn-primary" :disabled="saving" @click="saveBatch(true)">Complete batch</button></div></form>
+    </section></main>
 </template>
 
 <style scoped>
-.page { flex: 1; width: 100%; max-width: 1680px; margin: 0 auto; padding: 2rem; display: flex; flex-direction: column; gap: 1.25rem; }
-.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
-.eyebrow { font-size: .75rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-primary); }
-h1 { margin-top: .25rem; font-size: 1.5rem; }
-.intro { max-width: 42rem; margin-top: .5rem; color: var(--color-ink-soft); }
-.table-card { overflow: hidden; }
-.table-head { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--color-border); font-size: .875rem; font-weight: 600; }
-.link { border: 0; background: transparent; color: var(--color-primary); cursor: pointer; font: inherit; }
-.link:disabled { opacity: .55; cursor: wait; }
-.table-scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
-th, td { padding: .875rem 1.25rem; border-bottom: 1px solid var(--color-border); text-align: left; white-space: nowrap; }
-th { color: var(--color-ink-faint); font-size: .6875rem; letter-spacing: .04em; text-transform: uppercase; }
-tbody tr:last-child td { border-bottom: 0; }
-.note { color: var(--color-ink-faint); font-size: .8125rem; }
-@media (max-width: 720px) { .page { padding: 1.25rem 1rem; } .page-head { align-items: stretch; flex-direction: column; } .page-head .btn { width: 100%; min-height: 44px; } }
+.page{flex:1;width:100%;max-width:1680px;margin:0 auto;padding:2rem;display:flex;flex-direction:column;gap:1.25rem}.page-head,.page-head>div,.detail header,.modalish header,.actions{display:flex;align-items:center;justify-content:space-between;gap:1rem}.page-head{align-items:flex-end}.eyebrow{font-size:.75rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--color-primary)}h1{margin:.25rem 0;font-size:1.5rem}.intro,.hint,small{color:var(--color-ink-soft)}.stack,.form{display:flex;flex-direction:column;gap:1rem}.report-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem}.report-grid article{display:flex;flex-direction:column;gap:.35rem}.report-grid strong{font-size:1.35rem}.table-card{overflow:auto}table{width:100%;border-collapse:collapse}th,td{padding:.8rem 1rem;border-bottom:1px solid var(--color-border);text-align:left}th{font-size:.7rem;text-transform:uppercase;color:var(--color-ink-faint)}td small{display:block}.tabs{display:flex;gap:.5rem;flex-wrap:wrap}.tabs button{border:1px solid var(--color-border);background:var(--color-surface);padding:.55rem .8rem;border-radius:var(--radius-sm);text-transform:capitalize}.tabs .active{background:var(--color-primary);color:#fff}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;align-items:end}label{display:flex;flex-direction:column;gap:.3rem;font-size:.85rem;font-weight:600}textarea{min-height:4rem}.modalish{border:2px solid var(--color-primary)}.notice{padding:.7rem;background:var(--color-primary-soft);color:var(--color-primary);border-radius:var(--radius-sm)}.link{border:0;background:transparent;color:var(--color-primary);cursor:pointer;font:inherit}.danger{background:var(--color-danger,#b42318);color:#fff}dl{display:grid;grid-template-columns:max-content 1fr;gap:.4rem 1rem;text-transform:capitalize}dd{margin:0;font-weight:700}@media(max-width:720px){.page{padding:1rem}.page-head{align-items:stretch;flex-direction:column}.page-head .btn{width:100%}.report-grid{grid-template-columns:repeat(2,minmax(0,1fr))}th:nth-child(n+4),td:nth-child(n+4){display:none}}
 </style>

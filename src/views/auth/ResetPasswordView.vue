@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ApiError, useAuthStore } from '@/stores/auth'
+import { useAuthStore } from '@/stores/auth'
 import { fieldErrors } from '@/lib/api'
 import AuthShell from '@/components/auth/AuthShell.vue'
 

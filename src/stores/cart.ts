@@ -81,7 +81,7 @@ export const useCartStore = defineStore('cart', () => {
   const dueDate = ref('')
   const emptyFulfillment = (): Fulfillment => ({ type: 'walk_in', recipient_name: '', recipient_phone: '', address: '', location_notes: '', requested_at: '', instructions: '', notes: '', delivery_fee: 0 })
   const fulfillment = ref<Fulfillment>(emptyFulfillment())
-  const deliveryFee = computed(() => fulfillment.value.type === 'delivery' ? Math.max(0, Math.round(Number(fulfillment.value.delivery_fee) || 0)) : 0)
+  const deliveryFee = computed(() => fulfillment.value.type === 'delivery' ? Math.min(1000000000000, Math.max(0, Number.isFinite(Number(fulfillment.value.delivery_fee)) ? Math.round(Number(fulfillment.value.delivery_fee)) : 0)) : 0)
 
   const lineTotal = (line: CartLine) => roundMoney(line.quantity * line.unitPrice) - line.discount
   const subtotal = computed(() =>
@@ -117,7 +117,8 @@ export const useCartStore = defineStore('cart', () => {
       setQuantity(existing, existing.quantity + 1)
       return
     }
-    if (product.stock - baseInCart(product.id) < 1) return
+    const available = roundQty(product.stock - baseInCart(product.id))
+    if (available <= 0) return
 
     lines.value.push({
       id: uuid(),
@@ -127,7 +128,7 @@ export const useCartStore = defineStore('cart', () => {
       unit: product.base_unit,
       conversion: 1,
       unitPrice: product.selling_price,
-      quantity: 1,
+      quantity: Math.min(1, available),
       discount: 0,
       units: product.units,
       stock: product.stock,

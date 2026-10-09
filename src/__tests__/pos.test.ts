@@ -104,3 +104,16 @@ describe('POS typed input and checkout', () => {
 it('does not advertise Ask NileBot in any navigation group', () => {
   expect(navGroups.flatMap((group) => group.items).some((item) => item.to === '/ask')).toBe(false)
 })
+
+it('sells intentionally saleable fractional stock and separates delivery fees from discounts', async () => {
+  const cart = useCartStore()
+  cart.add({ ...product, stock: .5, kind: 'raw_material', is_saleable: true })
+  expect(cart.lines[0]?.quantity).toBe(.5)
+  cart.setOrderDiscount(500)
+  Object.assign(cart.fulfillment, { type: 'delivery', recipient_name: 'QA office', recipient_phone: 'QA phone', address: 'QA address', delivery_fee: 2000 })
+  expect(cart.total).toBe(5000)
+  vi.mocked(apiFetch).mockRejectedValueOnce(new Error('Lost response'))
+  await expect(cart.checkout([])).rejects.toThrow()
+  expect(cart.total).toBe(5000)
+  expect(vi.mocked(apiFetch).mock.calls[0]?.[1]?.body).toMatchObject({ expected_total: 5000, discount: 500, fulfillment: { type: 'delivery', delivery_fee: 2000 }, items: [{ quantity: .5 }] })
+})

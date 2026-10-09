@@ -163,7 +163,7 @@ onMounted(load)
         </section>
 
         <section class="card block">
-          <h2>Paid when received</h2>
+          <h2>Payments and supplier refunds</h2>
           <p v-if="!purchase.payments.length" class="muted">
             Nothing was paid at the time. Later payments are recorded on the supplier's account.
           </p>
@@ -173,7 +173,7 @@ onMounted(load)
                 >{{ paymentLabel(p.method)
                 }}<template v-if="p.reference"> · {{ p.reference }}</template></span
               >
-              <strong>{{ formatUgx(p.amount) }}</strong>
+              <strong>{{ p.direction === 'in' ? 'Refund received · ' : 'Paid · ' }}{{ formatUgx(p.amount) }}</strong>
             </li>
           </ul>
         </section>

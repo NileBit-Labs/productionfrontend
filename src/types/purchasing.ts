@@ -65,6 +65,7 @@ export interface PurchaseDetail extends PurchaseRow {
     id: number
     amount: number
     method: PaymentMethod
+    direction?: 'in' | 'out'
     reference: string | null
     created_at: string
   }[]

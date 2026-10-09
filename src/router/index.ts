@@ -167,12 +167,7 @@ const router = createRouter({
       component: () => import('../views/purchases/PurchaseDetailView.vue'),
       meta: { requiresAuth: true, title: 'Purchase', managerOnly: true },
     },
-    {
-      path: '/ask',
-      name: 'ask',
-      component: () => import('../views/ask/AskView.vue'),
-      meta: { requiresAuth: true, title: 'Ask NileBot', managerOnly: true },
-    },
+    { path: '/ask', redirect: '/' },
     {
       path: '/shifts',
       name: 'shifts',

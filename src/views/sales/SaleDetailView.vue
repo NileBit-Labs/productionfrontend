@@ -148,13 +148,14 @@ onMounted(load)
                 <dd>{{ formatUgx(sale.total) }}</dd>
               </div>
               <div>
-                <dt>Paid</dt>
+                <dt>Paid at checkout</dt>
                 <dd>{{ formatUgx(sale.amount_paid) }}</dd>
               </div>
               <div v-if="sale.amount_due > 0" class="owed">
-                <dt>Left on credit{{ sale.due_date ? ` (due ${sale.due_date})` : '' }}</dt>
+                <dt>Credit at checkout{{ sale.due_date ? ` (due ${sale.due_date})` : '' }}</dt>
                 <dd>{{ formatUgx(sale.amount_due) }}</dd>
               </div>
+              <div v-if="sale.outstanding !== undefined && sale.amount_due > 0" class="owed"><dt>Currently unpaid</dt><dd>{{ formatUgx(sale.outstanding) }}</dd></div>
             </dl>
 
             <p v-if="sale.status === 'voided'" class="voided-note">

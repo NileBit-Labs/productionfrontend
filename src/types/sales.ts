@@ -74,6 +74,7 @@ export interface Sale {
   discount: number
   total: number
   amount_paid: number
+  outstanding?: number
   amount_due: number
   created_at: string
   void_reason: string | null

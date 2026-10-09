@@ -83,13 +83,14 @@ const paidIn = computed(() => (props.sale.payments ?? []).filter((p) => p.direct
         <dd>{{ formatUgx(change) }}</dd>
       </div>
       <div v-if="sale.amount_due > 0" class="due">
-        <dt>On credit</dt>
+        <dt>Credit at checkout</dt>
         <dd>{{ formatUgx(sale.amount_due) }}</dd>
       </div>
       <div v-if="sale.amount_due > 0 && sale.due_date" class="due">
         <dt>Pay by</dt>
         <dd>{{ sale.due_date }}</dd>
       </div>
+      <div v-if="sale.outstanding !== undefined && sale.amount_due > 0" class="due"><dt>Currently unpaid</dt><dd>{{ formatUgx(sale.outstanding) }}</dd></div>
     </dl>
 
     <dl v-if="sale.refunds?.length" class="totals refunds">

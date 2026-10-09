@@ -198,6 +198,7 @@ async function onLogout() {
   <div v-if="updateReady" class="update-toast" role="status">
     <span>A new version is ready.</span>
     <button type="button" @click="applyUpdate">Reload</button>
+    <button type="button" class="defer-update" @click="updateReady = false">Later</button>
   </div>
 </template>
 
@@ -205,8 +206,9 @@ async function onLogout() {
 .update-toast {
   position: fixed;
   z-index: 60;
-  right: 1rem;
-  bottom: 1rem;
+  left: 50%;
+  top: 0.5rem;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 0.875rem;
@@ -217,6 +219,11 @@ async function onLogout() {
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
   font-size: 0.875rem;
+}
+
+.update-toast .defer-update {
+  background: transparent;
+  color: var(--color-text);
 }
 
 .update-toast button {

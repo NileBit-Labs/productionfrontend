@@ -1,12 +1,12 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { apiFetch, isNetworkFailure } from '@/lib/api'
 import { uuid } from '@/lib/format'
-import { useCatalogStore } from '@/stores/catalog'
+import { isSaleable, useCatalogStore } from '@/stores/catalog'
 import { useShopStore } from '@/stores/shop'
 import { useSyncStore } from '@/stores/sync'
 import type { OutboxEvent } from '@/lib/outbox'
-import type { PaymentMethod, PosProduct, ProductUnit, Sale } from '@/types/sales'
+import type { Fulfillment, PaymentMethod, PosProduct, ProductUnit, Sale } from '@/types/sales'
 
 export interface CartLine {
   id: string
@@ -79,6 +79,9 @@ export const useCartStore = defineStore('cart', () => {
   const attemptKey = ref(uuid())
   const customer = ref<{ id: number; name: string; phone: string | null } | null>(null)
   const dueDate = ref('')
+  const emptyFulfillment = (): Fulfillment => ({ type: 'walk_in', recipient_name: '', recipient_phone: '', address: '', location_notes: '', requested_at: '', instructions: '', notes: '', delivery_fee: 0 })
+  const fulfillment = ref<Fulfillment>(emptyFulfillment())
+  const deliveryFee = computed(() => fulfillment.value.type === 'delivery' ? Math.max(0, Math.round(Number(fulfillment.value.delivery_fee) || 0)) : 0)
 
   const lineTotal = (line: CartLine) => roundMoney(line.quantity * line.unitPrice) - line.discount
   const subtotal = computed(() =>
@@ -87,7 +90,10 @@ export const useCartStore = defineStore('cart', () => {
   const discountTotal = computed(
     () => lines.value.reduce((sum, l) => sum + l.discount, 0) + orderDiscount.value,
   )
-  const total = computed(() => Math.max(0, subtotal.value - discountTotal.value))
+  watch([subtotal, () => lines.value.reduce((sum, l) => sum + l.discount, 0)], () => {
+    setOrderDiscount(orderDiscount.value)
+  }, { flush: 'sync' })
+  const total = computed(() => Math.max(0, subtotal.value - discountTotal.value) + deliveryFee.value)
   const itemCount = computed(() => lines.value.length)
 
   // How much of a product (in its base unit) is already in the cart,
@@ -103,6 +109,7 @@ export const useCartStore = defineStore('cart', () => {
   }
 
   function add(product: PosProduct) {
+    if (!isSaleable(product)) return
     const existing = lines.value.find(
       (l) => l.productId === product.id && l.unit === product.base_unit,
     )
@@ -158,12 +165,12 @@ export const useCartStore = defineStore('cart', () => {
 
   function setLineDiscount(line: CartLine, discount: number) {
     const gross = roundMoney(line.quantity * line.unitPrice)
-    line.discount = Math.min(Math.max(Math.round(discount) || 0, 0), gross)
+    line.discount = Math.min(Math.max((Number.isFinite(discount) ? Math.round(discount) : 0), 0), gross)
   }
 
   function setOrderDiscount(discount: number) {
     const room = subtotal.value - lines.value.reduce((sum, l) => sum + l.discount, 0)
-    orderDiscount.value = Math.min(Math.max(Math.round(discount) || 0, 0), Math.max(room, 0))
+    orderDiscount.value = Math.min(Math.max((Number.isFinite(discount) ? Math.round(discount) : 0), 0), Math.max(room, 0))
   }
 
   function setCustomer(next: { id: number; name: string; phone: string | null } | null) {
@@ -180,6 +187,7 @@ export const useCartStore = defineStore('cart', () => {
     orderDiscount.value = 0
     customer.value = null
     dueDate.value = ''
+    fulfillment.value = emptyFulfillment()
     attemptKey.value = uuid()
   }
 
@@ -196,6 +204,7 @@ export const useCartStore = defineStore('cart', () => {
 
     const body = {
       idempotency_key: key,
+      fulfillment: fulfillment.value.type === 'walk_in' ? undefined : { ...fulfillment.value, requested_at: fulfillment.value.requested_at ? new Date(fulfillment.value.requested_at).toISOString() : null, delivery_fee: deliveryFee.value },
       // Used only when the sale is synced later, to detect a price change.
       expected_total: due,
       customer_id: buyer?.id,
@@ -226,7 +235,7 @@ export const useCartStore = defineStore('cart', () => {
     } catch (e) {
       // The server said no (bad stock, validation...): tell the cashier.
       // If it simply couldn't be reached, keep the sale on this device.
-      if (!isNetworkFailure(e) || !shop) throw e
+      if (!isNetworkFailure(e) || !shop || fulfillment.value.type !== 'walk_in') throw e
       sale = await saveOffline(shop.id, key, body, snapshot, payments, due, buyer)
     }
 
@@ -289,6 +298,8 @@ export const useCartStore = defineStore('cart', () => {
     lines,
     customer,
     dueDate,
+    fulfillment,
+    deliveryFee,
     orderDiscount,
     subtotal,
     discountTotal,

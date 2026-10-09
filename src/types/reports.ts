@@ -25,6 +25,8 @@ export interface DashboardOwnerManager {
     credit_given: number
     expenses: number
     gross_profit?: number
+    net_profit?: number
+    wastage_losses?: number
   }
   yesterday_net_sales: number
   week: { net_sales: number; previous_net_sales: number }
@@ -96,6 +98,9 @@ export interface ProfitReport {
     gross_profit: number
     margin: number | null
     expenses: number
+    wastage_losses: number
+    net_profit: number
+    net_margin?: number | null
     operating_profit: number
   }
   daily: {
@@ -104,6 +109,9 @@ export interface ProfitReport {
     cost_of_goods: number
     gross_profit: number
     expenses: number
+    wastage_losses: number
+    net_profit: number
+    net_margin?: number | null
     operating_profit: number
   }[]
   expenses: { category: string; amount: number }[]

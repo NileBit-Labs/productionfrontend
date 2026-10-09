@@ -189,9 +189,9 @@ function shown(iso: string): string {
         />
         <StatTile
           v-if="full.role === 'owner'"
-          label="Gross profit"
-          :value="formatUgx(full.today.gross_profit ?? 0)"
-          hint="Sales less the cost of what was sold"
+          label="Net profit"
+          :value="formatUgx(full.today.net_profit ?? 0)"
+          hint="After cost of goods, operating expenses and standalone stock losses"
           icon="reports"
         />
         <StatTile

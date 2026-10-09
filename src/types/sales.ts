@@ -15,6 +15,8 @@ export interface ProductUnit {
 }
 
 export interface PosProduct {
+  kind?: string
+  is_saleable?: boolean
   id: number
   name: string
   sku: string | null
@@ -50,7 +52,21 @@ export interface SalePayment {
   direction: 'in' | 'out'
 }
 
+export interface Fulfillment {
+  type: 'walk_in' | 'pickup' | 'delivery'
+  recipient_name: string
+  recipient_phone: string
+  address: string
+  location_notes: string
+  requested_at: string
+  instructions: string
+  notes: string
+  delivery_fee: number
+}
+
 export interface Sale {
+  delivery_fee?: number
+  delivery_order?: { id: number; status: string; fulfillment_type: string } | null
   id: number
   sale_number: string
   status: 'completed' | 'voided'
@@ -68,7 +84,7 @@ export interface Sale {
   items_count?: number
   payments?: SalePayment[]
   refunds?: RefundRecord[]
-  shop?: { id: number; name: string; phone: string | null; address: string | null }
+  shop?: { business_name?: string | null; id: number; name: string; phone: string | null; address: string | null }
 }
 
 export interface RefundRecord {

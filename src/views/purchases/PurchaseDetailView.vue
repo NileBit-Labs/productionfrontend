@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import BaseModal from '@/components/BaseModal.vue'
 import { apiErrorMessage, apiFetch } from '@/lib/api'
 import { formatDateTime, formatQuantity, formatUgx } from '@/lib/format'
 import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONE, type PurchaseDetail } from '@/types/purchasing'
-import { paymentLabel } from '@/types/sales'
+import { PAYMENT_METHODS, paymentLabel } from '@/types/sales'
 
 const route = useRoute()
 
@@ -15,6 +15,23 @@ const cancelling = ref(false)
 const reason = ref('')
 const saving = ref(false)
 const cancelError = ref('')
+const returning = ref(false)
+const returnReason = ref('')
+const returnQuantity = reactive<Record<number, number>>({})
+const refundReceived = ref(false)
+const refundMethod = ref('BANK')
+let returnKey = crypto.randomUUID()
+const returnLines = computed(() => Object.entries(returnQuantity).filter(([, quantity]) => quantity > 0).map(([id, quantity]) => ({ purchase_item_id: Number(id), quantity })))
+async function returnItems() {
+  saving.value = true
+  cancelError.value = ''
+  try {
+    await apiFetch(`/purchases/${route.params.id}/returns`, { method: 'POST', body: { idempotency_key: returnKey, reason: returnReason.value, lines: returnLines.value, refund_received: refundReceived.value, method: refundMethod.value } })
+    returnKey = crypto.randomUUID()
+    returning.value = false
+    await load()
+  } catch (e) { cancelError.value = apiErrorMessage(e) } finally { saving.value = false }
+}
 
 async function load() {
   error.value = ''
@@ -72,7 +89,7 @@ onMounted(load)
           <p v-if="purchase.note" class="note">{{ purchase.note }}</p>
         </div>
 
-        <div class="actions">
+        <div class="actions"><button v-if="purchase.status === 'received'" class="btn ui-btn-secondary" @click="returning = true; cancelError = ''">Return to supplier</button>
           <RouterLink
             v-if="purchase.owed > 0"
             class="btn btn-primary"
@@ -190,6 +207,12 @@ onMounted(load)
         </form>
       </BaseModal>
     </template>
+    <BaseModal v-if="returning && purchase" title="Return to supplier" @close="returning = false">
+      <form @submit.prevent="returnItems"><p>Record goods actually returned. Unpaid amounts reduce supplier debt. A paid portion requires confirmation of the supplier refund.</p><p v-if="cancelError" class="alert-danger">{{ cancelError }}</p>
+        <div v-for="item in purchase.items" :key="item.id" class="field"><label :for="`return-${item.id}`">{{ item.product_name }} · {{ item.unit_name ?? item.base_unit }}</label><input :id="`return-${item.id}`" v-model.number="returnQuantity[item.id]" type="number" min="0" :max="item.quantity" step=".001" /></div>
+        <div class="field"><label for="supplier-return-reason">Reason</label><input id="supplier-return-reason" v-model="returnReason" required minlength="3" maxlength="500" /></div><label><input v-model="refundReceived" type="checkbox" /> Supplier refund received, if any paid amount is being returned</label><div class="field"><label for="supplier-refund-method">Refund method</label><select id="supplier-refund-method" v-model="refundMethod"><option v-for="method in PAYMENT_METHODS" :key="method.value" :value="method.value">{{ method.label }}</option></select></div><button class="btn btn-primary" :disabled="saving || !returnLines.length">Record return</button>
+      </form>
+    </BaseModal>
   </main>
 </template>
 

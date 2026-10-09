@@ -86,10 +86,10 @@ const pct = (v: number | null) => (v === null ? '—' : `${v}%`)
           icon="reports"
         />
         <StatTile
-          label="Profit after expenses"
-          :value="formatUgx(s.operating_profit)"
-          :hint="`${formatUgx(s.expenses)} of expenses`"
-          :trend="s.operating_profit > 0 ? 'up' : s.operating_profit < 0 ? 'down' : null"
+          label="Net profit"
+          :value="formatUgx(s.net_profit)"
+          :hint="`${formatUgx(s.expenses)} expenses · ${formatUgx(s.wastage_losses)} stock losses`"
+          :trend="s.net_profit > 0 ? 'up' : s.net_profit < 0 ? 'down' : null"
           icon="expenses"
         />
       </section>
@@ -144,10 +144,11 @@ const pct = (v: number | null) => (v === null ? '—' : `${v}%`)
                 <td>− Expenses</td>
                 <td class="num">{{ formatUgx(s.expenses) }}</td>
               </tr>
+              <tr><td>− Standalone stock losses</td><td class="num">{{ formatUgx(s.wastage_losses) }}</td></tr>
               <tr>
-                <td class="strong">Profit after expenses</td>
-                <td class="num strong" :class="{ neg: s.operating_profit < 0 }">
-                  {{ formatUgx(s.operating_profit) }}
+                <td class="strong">Net profit</td>
+                <td class="num strong" :class="{ neg: s.net_profit < 0 }">
+                  {{ formatUgx(s.net_profit) }}
                 </td>
               </tr>
             </tbody>
@@ -191,7 +192,7 @@ const pct = (v: number | null) => (v === null ? '—' : `${v}%`)
         <b>How this is worked out.</b> Cost uses what each item cost when it was sold, so changing a
         cost price later never rewrites past profit. Goods that come back and go on the shelf give
         their cost back; damaged returns don't, so they show as a real loss. Expenses count on the
-        date written on the expense. Showing the 50 most profitable products.
+        date written on the expense. Standalone stock losses reduce net profit; batch wastage is already included in batch cost. Showing the 50 most profitable products.
       </p>
     </template>
   </div>

@@ -25,6 +25,16 @@ const shopForm = ref({
   phone: shop?.phone ?? '',
   address: shop?.address ?? '',
 })
+const organizationName = ref(auth.user?.organization?.name ?? '')
+const businessSaved = ref(false)
+async function saveBusiness() {
+  shopError.value = ''
+  try {
+    await apiFetch('/organization', { method: 'PATCH', body: { name: organizationName.value } })
+    await auth.fetchMe()
+    businessSaved.value = true
+  } catch (e) { shopError.value = apiErrorMessage(e) }
+}
 const shopBusy = ref(false)
 const shopError = ref('')
 const shopSaved = ref(false)
@@ -96,6 +106,7 @@ async function changePassword() {
       <h1>Settings</h1>
     </header>
 
+<section v-if="auth.isOwner" class="card block"><h2>Business identity</h2><form class="grid" @submit.prevent="saveBusiness"><div class="field"><label for="organization-name">Organization / business name</label><input id="organization-name" v-model="organizationName" required maxlength="255" /></div><button class="btn btn-primary">Save business name</button><p v-if="businessSaved" role="status">Business name saved.</p><p v-if="shopError" class="alert-danger">{{ shopError }}</p></form><p>Receipts show this business name and the configured outlet below it.</p></section>
     <section class="card block">
       <div class="block-head">
         <h2>Production location</h2>

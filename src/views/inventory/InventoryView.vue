@@ -155,7 +155,7 @@ function updated() {
 
 const referenceText = (m: Movement) => {
   if (!m.reference) return ''
-  const kind = m.reference.type === 'Sale' ? 'Sale' : m.reference.type
+  const kind = ({ ProductionBatch: 'Production batch', WastageRecord: 'Stock write-off' } as Record<string, string>)[m.reference.type] ?? m.reference.type
   return m.reference.label ? `${kind} ${m.reference.label}` : kind
 }
 

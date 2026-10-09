@@ -11,6 +11,9 @@ interface PullResponse {
 
 const cacheKey = (shopId: number) => `pos_catalog_${shopId}`
 const cursorKey = (shopId: number) => `pos_catalog_cursor_${shopId}`
+export const isSaleable = (p: PosProduct) =>
+  (!p.status || p.status === 'active') && p.selling_price > 0 &&
+  (p.is_saleable ?? (!p.kind || p.kind === 'finished_good'))
 const round = (n: number) => Math.round(n * 1000) / 1000
 
 export const useCatalogStore = defineStore('catalog', () => {
@@ -39,13 +42,14 @@ export const useCatalogStore = defineStore('catalog', () => {
   function merge(response: PullResponse) {
     if (response.full) {
       products.value = response.products
+        .filter(isSaleable)
         .map(withServerStock)
         .sort((a, b) => a.name.localeCompare(b.name))
       return
     }
     const byId = new Map(products.value.map((p) => [p.id, p]))
     for (const product of response.products) {
-      if (product.status && product.status !== 'active') byId.delete(product.id)
+      if (!isSaleable(product)) byId.delete(product.id)
       else byId.set(product.id, withServerStock(product))
     }
     products.value = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
@@ -61,7 +65,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     const saved = localStorage.getItem(cacheKey(shopId))
     const cursor = localStorage.getItem(cursorKey(shopId))
     if (saved) {
-      products.value = (JSON.parse(saved) as PosProduct[]).map(withServerStock)
+      products.value = (JSON.parse(saved) as PosProduct[]).filter(isSaleable).map(withServerStock)
       applyReserved(reserved)
     }
 

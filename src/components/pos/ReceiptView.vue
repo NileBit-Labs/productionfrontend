@@ -16,11 +16,12 @@ const paidIn = computed(() => (props.sale.payments ?? []).filter((p) => p.direct
     </p>
 
     <header class="receipt-head">
-      <h2>{{ sale.shop?.name }}</h2>
+      <h2>{{ sale.shop?.business_name ?? sale.shop?.name }}</h2>
       <p v-if="sale.shop?.address">{{ sale.shop.address }}</p>
       <p v-if="sale.shop?.phone">{{ sale.shop.phone }}</p>
     </header>
 
+    <p v-if="sale.shop?.business_name">{{ sale.shop.name }}</p>
     <dl class="meta">
       <div>
         <dt>Receipt</dt>
@@ -64,6 +65,7 @@ const paidIn = computed(() => (props.sale.payments ?? []).filter((p) => p.direct
         <dt>Discount</dt>
         <dd>− {{ formatUgx(sale.discount) }}</dd>
       </div>
+      <div v-if="sale.delivery_fee"><dt>Delivery fee</dt><dd>{{ formatUgx(sale.delivery_fee) }}</dd></div>
       <div class="grand">
         <dt>Total</dt>
         <dd>{{ formatUgx(sale.total) }}</dd>

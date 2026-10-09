@@ -15,6 +15,7 @@ const props = defineProps<{ sale: Sale }>()
 const emit = defineEmits<{ close: []; done: [] }>()
 
 interface Info {
+  delivery_fee_remaining: number
   items: Refundable[]
   customer: { name: string; balance: number; owed_on_this_sale: number } | null
 }
@@ -24,6 +25,7 @@ const quantity = reactive<Record<number, number>>({})
 const restock = reactive<Record<number, boolean>>({})
 const method = ref<PaymentMethod>('CASH')
 const reason = ref('')
+const feeRefund = ref(0)
 const plan = ref<RefundPlan | null>(null)
 const loading = ref(true)
 const submitting = ref(false)
@@ -43,18 +45,18 @@ const lines = computed(() =>
 
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(
-  [quantity, restock],
+  [quantity, restock, feeRefund],
   () => {
     clearTimeout(timer)
     plan.value = null
-    if (!lines.value.length) return
+    if (!lines.value.length && feeRefund.value <= 0) return
     // The server is the only place that prices a refund, so preview asks it.
     timer = setTimeout(async () => {
       try {
         error.value = ''
         plan.value = await apiFetch<RefundPlan>(`/sales/${props.sale.id}/refund`, {
           method: 'POST',
-          body: { dry_run: true, lines: lines.value },
+          body: { dry_run: true, lines: lines.value, delivery_fee_refund: feeRefund.value },
         })
       } catch (e) {
         error.value = apiErrorMessage(e)
@@ -99,6 +101,7 @@ async function submit() {
       body: {
         idempotency_key: key,
         lines: lines.value,
+        delivery_fee_refund: feeRefund.value,
         method: plan.value && plan.value.cash_refund > 0 ? method.value : undefined,
         reason: reason.value,
       },
@@ -124,6 +127,7 @@ async function submit() {
         <button type="button" class="link all" @click="setAll">Refund everything</button>
       </div>
 
+<div v-if="info.delivery_fee_remaining > 0" class="field"><label for="fee-refund">Delivery fee to refund (UGX)</label><input id="fee-refund" v-model.number="feeRefund" type="number" min="0" :max="info.delivery_fee_remaining" /></div>
       <ul class="items">
         <li
           v-for="item in info.items"

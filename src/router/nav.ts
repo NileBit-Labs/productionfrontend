@@ -31,6 +31,7 @@ export const navGroups: NavGroup[] = [
         owner: 'Elioda — Sales/POS',
         ready: true,
       },
+      { label: 'Fulfillment', to: '/delivery', icon: 'sales', owner: 'Production', ready: true, managerOnly: true },
       { label: 'Shifts', to: '/shifts', icon: 'shifts', owner: 'Elioda — Shifts', ready: true },
     ],
   },
@@ -115,19 +116,6 @@ export const navGroups: NavGroup[] = [
         to: '/reports',
         icon: 'reports',
         owner: 'Douglas — Reports',
-        ready: true,
-        managerOnly: true,
-      },
-    ],
-  },
-  {
-    label: 'AI',
-    items: [
-      {
-        label: 'Ask NileBot',
-        to: '/ask',
-        icon: 'ask',
-        owner: 'Assistant',
         ready: true,
         managerOnly: true,
       },

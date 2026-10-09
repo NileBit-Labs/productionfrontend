@@ -59,6 +59,7 @@ const router = createRouter({
       component: () => import('../views/pos/PosView.vue'),
       meta: { requiresAuth: true, title: 'Sell' },
     },
+    { path: '/delivery', name: 'delivery', component: () => import('../views/delivery/DeliveryView.vue'), meta: { requiresAuth: true, title: 'Order fulfillment', managerOnly: true } },
     {
       path: '/sales',
       name: 'sales',
@@ -167,12 +168,7 @@ const router = createRouter({
       component: () => import('../views/purchases/PurchaseDetailView.vue'),
       meta: { requiresAuth: true, title: 'Purchase', managerOnly: true },
     },
-    {
-      path: '/ask',
-      name: 'ask',
-      component: () => import('../views/ask/AskView.vue'),
-      meta: { requiresAuth: true, title: 'Ask NileBot', managerOnly: true },
-    },
+    { path: '/ask', redirect: '/' },
     {
       path: '/shifts',
       name: 'shifts',

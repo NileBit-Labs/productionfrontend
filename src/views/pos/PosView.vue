@@ -343,8 +343,8 @@ async function share() {
                   min="0"
                   :max="cart.maxQuantity(line)"
                   :aria-label="`${line.name} quantity`"
-                  @change="
-                    cart.setQuantity(line, Number(($event.target as HTMLInputElement).value))
+                  @input="
+                    ($event.target as HTMLInputElement).value !== '' && cart.setQuantity(line, Number(($event.target as HTMLInputElement).value))
                   "
                 />
                 <button
@@ -403,6 +403,21 @@ async function share() {
           </button>
         </div>
 
+        <div class="field">
+          <label for="fulfillment-type">Order type</label>
+          <select id="fulfillment-type" v-model="cart.fulfillment.type"><option value="walk_in">Walk-in</option><option value="pickup">Pickup</option><option value="delivery">Delivery</option></select>
+        </div>
+        <div v-if="cart.fulfillment.type !== 'walk_in'" class="fulfillment-fields">
+          <div class="field"><label for="recipient-name">Recipient name</label><input id="recipient-name" v-model="cart.fulfillment.recipient_name" required maxlength="255" /></div>
+          <div class="field"><label for="recipient-phone">Recipient contact</label><input id="recipient-phone" v-model="cart.fulfillment.recipient_phone" type="tel" required maxlength="100" /></div>
+          <div v-if="cart.fulfillment.type === 'delivery'" class="field"><label for="delivery-address">Delivery address</label><input id="delivery-address" v-model="cart.fulfillment.address" required maxlength="500" /></div>
+          <div v-if="cart.fulfillment.type === 'delivery'" class="field"><label for="location-notes">Location notes</label><input id="location-notes" v-model="cart.fulfillment.location_notes" maxlength="1000" /></div>
+          <div class="field"><label for="requested-at">Requested date and time</label><input id="requested-at" v-model="cart.fulfillment.requested_at" type="datetime-local" /></div>
+          <div class="field"><label for="delivery-instructions">Instructions</label><input id="delivery-instructions" v-model="cart.fulfillment.instructions" maxlength="1000" /></div>
+          <div class="field"><label for="order-notes">Order notes</label><input id="order-notes" v-model="cart.fulfillment.notes" maxlength="1000" /></div>
+          <div v-if="cart.fulfillment.type === 'delivery'" class="field"><label for="delivery-fee">Delivery fee (UGX)</label><input id="delivery-fee" v-model.number="cart.fulfillment.delivery_fee" type="number" min="0" step="1" /></div>
+          <p class="hint">Use a customer account for partial payment or pay on delivery. Dispatch is managed under Fulfillment. These orders require a connection.</p>
+        </div>
         <dl class="sums">
           <div>
             <dt>Subtotal</dt>
@@ -418,10 +433,11 @@ async function share() {
                 inputmode="numeric"
                 min="0"
                 placeholder="0"
-                @change="cart.setOrderDiscount(Number(($event.target as HTMLInputElement).value))"
+                @input="cart.setOrderDiscount(Number(($event.target as HTMLInputElement).value))"
               />
             </dd>
           </div>
+          <div v-if="cart.deliveryFee"><dt>Delivery fee</dt><dd>{{ formatUgx(cart.deliveryFee) }}</dd></div>
           <div class="grand">
             <dt>Total</dt>
             <dd>{{ formatUgx(cart.total) }}</dd>
@@ -431,7 +447,7 @@ async function share() {
         <button
           type="button"
           class="btn btn-primary btn-block charge"
-          :disabled="cart.total <= 0"
+          :disabled="cart.total <= 0 || (cart.fulfillment.type !== 'walk_in' && (!cart.fulfillment.recipient_name.trim() || !cart.fulfillment.recipient_phone.trim() || (cart.fulfillment.type === 'delivery' && !cart.fulfillment.address.trim())))"
           @click="showCheckout = true"
         >
           Charge {{ formatUgx(cart.total) }}
@@ -872,6 +888,7 @@ async function share() {
   color: var(--color-ink);
 }
 
+.fulfillment-fields { display: grid; gap: .5rem; margin: .75rem 0; }
 .discount-row input {
   width: 110px;
   height: 34px;

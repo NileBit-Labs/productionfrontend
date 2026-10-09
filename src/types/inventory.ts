@@ -34,6 +34,10 @@ export type MovementType =
   | 'DAMAGE'
   | 'LOSS'
   | 'ADJUSTMENT'
+  | 'PRODUCTION_INPUT'
+  | 'PRODUCTION_OUTPUT'
+  | 'WASTAGE'
+  | 'PRODUCTION_REVERSAL'
 
 export const MOVEMENT_LABELS: Record<MovementType, string> = {
   OPENING_STOCK: 'Opening stock',
@@ -44,6 +48,10 @@ export const MOVEMENT_LABELS: Record<MovementType, string> = {
   DAMAGE: 'Damaged',
   LOSS: 'Lost',
   ADJUSTMENT: 'Stock adjustment',
+  PRODUCTION_INPUT: 'Used in production',
+  PRODUCTION_OUTPUT: 'Produced',
+  WASTAGE: 'Production wastage',
+  PRODUCTION_REVERSAL: 'Production reversal',
 }
 
 export interface Movement {

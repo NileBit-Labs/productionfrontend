@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { apiFetch, isNetworkFailure } from '@/lib/api'
 import { uuid } from '@/lib/format'
 import { isSaleable, useCatalogStore } from '@/stores/catalog'
+import { useAuthStore } from '@/stores/auth'
 import { useShopStore } from '@/stores/shop'
 import { useSyncStore } from '@/stores/sync'
 import type { OutboxEvent } from '@/lib/outbox'
@@ -31,6 +32,7 @@ export interface PaymentInput {
 // A receipt for a sale that only exists on this device so far (id 0).
 export function provisionalSale(event: OutboxEvent): Sale {
   const shop = useShopStore().currentShop
+  const organization = useAuthStore().user?.organization
   const { lines, subtotal, discount, total, payments, amountDue, customer } = event.summary
   return {
     id: 0,
@@ -46,7 +48,7 @@ export function provisionalSale(event: OutboxEvent): Sale {
     void_reason: null,
     cashier: { id: event.userId, name: event.cashierName },
     shop: shop
-      ? { id: shop.id, name: shop.name, phone: shop.phone, address: shop.address }
+      ? { id: shop.id, name: shop.name, phone: shop.phone, address: shop.address, business_name: organization?.id === shop.organization_id ? organization.name : undefined }
       : undefined,
     items: lines.map((l, i) => ({
       id: i,

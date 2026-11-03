@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import WhatsAppConnections from '@/components/WhatsAppConnections.vue'
 import { apiErrorMessage, apiFetch } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import { useShopStore, type Shop } from '@/stores/shop'
@@ -267,6 +268,8 @@ async function changePassword() {
         </div>
       </form>
     </section>
+
+    <WhatsAppConnections class="card block" />
 
     <section v-if="auth.isOwner" class="card block">
       <div class="block-head">

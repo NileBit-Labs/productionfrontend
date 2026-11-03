@@ -14,14 +14,17 @@ const method = ref<PaymentMethod>('CASH')
 const reference = ref('')
 const saving = ref(false)
 const error = ref('')
+const operationKey = crypto.randomUUID()
 
 async function submit() {
+  if (saving.value) return
   saving.value = true
   error.value = ''
   try {
     const updated = await apiFetch<Customer>(`/customers/${props.customer.id}/payments`, {
       method: 'POST',
       body: {
+        idempotency_key: operationKey,
         amount: Math.round(Number(amount.value)),
         method: method.value,
         reference: reference.value || undefined,
